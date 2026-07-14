@@ -1,14 +1,17 @@
 #pragma once
 
 #include <string>
+#include <phoenix/serial/SerialDeviceKind.h>
 
 namespace phoenix::serial
 {
     struct SerialPortInfo
     {
-        std::string portName;      // COM3
-        std::string displayName;   // Arduino Mega 2560 (COM3)
-        std::string hardwareId;    // USB\VID_2341&PID_0042...
-        std::string manufacturer;  // Arduino LLC
+        std::string portName;
+        std::string displayName;
+        std::string manufacturer;
+        std::string hardwareId;
+
+        SerialDeviceKind kind = SerialDeviceKind::Unknown;
     };
 }

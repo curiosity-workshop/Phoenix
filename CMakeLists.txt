@@ -14,10 +14,11 @@ add_executable(Phoenix
     # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
     core/src/serial/WindowsSerialTransport.cpp
+    core/src/serial/SerialDeviceClassifier.cpp
 
     # Discovery
     core/src/discovery/LegacyXplproProbe.cpp
-)    
+ "core/include/phoenix/serial/SerialDeviceKind.h" "core/include/phoenix/serial/SerialDeviceClassifier.h" "core/src/serial/SerialDeviceClassifier.cpp")    
 
 target_include_directories(Phoenix
     PRIVATE
