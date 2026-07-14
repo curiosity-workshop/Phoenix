@@ -1,4 +1,5 @@
 #include <phoenix/serial/WindowsSerialEnumerator.h>
+#include <phoenix/serial/WindowsSerialTransport.h>
 
 #include <iostream>
 
@@ -22,6 +23,23 @@ int main()
             << "  Manufacturer: " << port.manufacturer << '\n'
             << "  Hardware ID:  " << port.hardwareId << "\n\n";
     }
+
+    phoenix::serial::WindowsSerialTransport transport(
+        "COM5",
+        115200);
+
+    if (!transport.open())
+    {
+        std::cerr << "Unable to open COM5\n";
+        return 1;
+    }
+
+    std::cout << "Opened COM5 successfully\n";
+
+    transport.close();
+
+    std::cout << "Closed COM5 successfully\n";
+   
 
     std::cout << "Phoenix stopped\n";
     return 0;

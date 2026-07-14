@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(Phoenix
     core/src/main.cpp
     core/src/serial/WindowsSerialEnumerator.cpp
+    core/src/serial/WindowsSerialTransport.cpp
 )
 
 target_include_directories(Phoenix
