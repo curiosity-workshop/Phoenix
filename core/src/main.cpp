@@ -339,11 +339,18 @@ namespace
 
         const auto deadline =
             std::chrono::steady_clock::now() +
-            std::chrono::seconds{ 4 };
+            std::chrono::seconds{ 8 };
+
+        auto nextToggleTime =
+            std::chrono::steady_clock::now();
+
+        bool emulatedDataRefState = true;
 
         while (std::chrono::steady_clock::now() < deadline)
         {
             const auto tick = controller.tick();
+            const auto now =
+                std::chrono::steady_clock::now();
 
             if (tick.session.bytesRead > 0 ||
                 tick.session.bytesWritten > 0 ||
@@ -363,6 +370,77 @@ namespace
                     << " byte(s).\n";
 
                 phoenix::logging::info(message.str());
+            }
+
+            if (!controller.updateSubscriptions().empty() &&
+                now >= nextToggleTime)
+            {
+                for (const auto& subscription :
+                    controller.updateSubscriptions())
+                {
+                    std::ostringstream payload;
+
+                    payload
+                        << ','
+                        << subscription.handle
+                        << ','
+                        << (emulatedDataRefState ? 1 : 0);
+
+                    if (subscription.element)
+                    {
+                        payload
+                            << ','
+                            << *subscription.element;
+
+                        session.queueFrame(
+                            phoenix::protocol::legacy::dataRefUpdateIntArrayCommand,
+                            payload.str());
+                    }
+                    else
+                    {
+                        session.queueFrame(
+                            phoenix::protocol::legacy::dataRefUpdateIntCommand,
+                            payload.str());
+                    }
+
+                    std::ostringstream message;
+
+                    message
+                        << "    X-Plane emulator sent dataref handle "
+                        << subscription.handle
+                        << " = "
+                        << (emulatedDataRefState ? 1 : 0);
+
+                    if (subscription.element)
+                    {
+                        message
+                            << " element "
+                            << *subscription.element;
+                    }
+
+                    message << '\n';
+
+                    phoenix::logging::info(message.str());
+                }
+
+                const std::size_t bytesWritten =
+                    session.flushPendingOutput();
+
+                if (bytesWritten > 0)
+                {
+                    std::ostringstream message;
+
+                    message
+                        << "    Tick: emulator wrote "
+                        << bytesWritten
+                        << " data update byte(s).\n";
+
+                    phoenix::logging::info(message.str());
+                }
+
+                emulatedDataRefState = !emulatedDataRefState;
+                nextToggleTime =
+                    now + std::chrono::seconds{ 2 };
             }
 
             std::this_thread::sleep_for(

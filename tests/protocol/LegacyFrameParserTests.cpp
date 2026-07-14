@@ -44,6 +44,7 @@ int main()
     using phoenix::protocol::legacy::DataRefUpdate;
     using phoenix::protocol::legacy::DataRefValueType;
     using phoenix::protocol::legacy::DeviceName;
+    using phoenix::protocol::legacy::NoMoreRequests;
     using phoenix::protocol::legacy::RegisterCommand;
     using phoenix::protocol::legacy::StringDataRefUpdate;
     using phoenix::protocol::legacy::UpdatesRequest;
@@ -186,6 +187,18 @@ int main()
         passed &= expect(update != nullptr, "string update metadata should decode");
         passed &= expect(update && update->handle == 12, "string update handle failed");
         passed &= expect(update && update->byteCount == 10, "string update byte count failed");
+    }
+
+    {
+        LegacyFrameParser parser;
+
+        const auto frames = parser.push(bytes("[c]"));
+        passed &= expect(frames.size() == 1, "no-more-requests frame should parse");
+
+        const auto message = decodeFrame(frames[0]);
+        passed &= expect(
+            std::holds_alternative<NoMoreRequests>(message),
+            "no-more-requests should decode as inert legacy message");
     }
 
     return passed ? 0 : 1;

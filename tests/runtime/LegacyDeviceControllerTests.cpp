@@ -297,6 +297,19 @@ int main()
     passed &= expect(tick.session.bytesWritten == 3, "registration query should flush");
     passed &= expect(transport.writtenText() == "[Q]", "registration query frame failed");
 
+    transport.pushIncoming("[c]");
+    tick = controller.tick();
+
+    passed &= expect(tick.messagesProcessed == 1, "no-more-requests should process");
+    passed &= expect(controller.dataRefs().empty(), "no-more-requests should not add datarefs");
+    passed &= expect(controller.commands().empty(), "no-more-requests should not add commands");
+    passed &= expect(
+        controller.updateSubscriptions().empty(),
+        "no-more-requests should not add subscriptions");
+    passed &= expect(
+        transport.writtenText() == "[Q]",
+        "no-more-requests should not queue a response");
+
     transport.pushIncoming("[b,\"sim/test/int\"]");
     tick = controller.tick();
 
