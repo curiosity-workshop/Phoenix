@@ -1,10 +1,11 @@
 #include <phoenix/discovery/LegacyXplproProbe.h>
+#include <phoenix/logging/Log.h>
 #include <phoenix/serial/SerialDeviceClassifier.h>
 #include <phoenix/serial/SerialDeviceKind.h>
 #include <phoenix/serial/WindowsSerialEnumerator.h>
 #include <phoenix/serial/WindowsSerialTransport.h>
 
-#include <iostream>
+#include <sstream>
 #include <string_view>
 
 namespace
@@ -38,7 +39,9 @@ namespace
         const phoenix::serial::SerialPortInfo& port,
         phoenix::serial::SerialDeviceKind kind)
     {
-        std::cout
+        std::ostringstream message;
+
+        message
             << port.portName << '\n'
             << "  Classification: "
             << deviceKindName(kind) << '\n'
@@ -48,29 +51,37 @@ namespace
             << port.manufacturer << '\n'
             << "  Hardware ID:    "
             << port.hardwareId << "\n\n";
+
+        phoenix::logging::info(message.str());
     }
 }
 
 int main()
 {
-    std::cout
-        << "Phoenix starting\n"
-        << "Enumerating serial ports...\n\n";
+    phoenix::logging::info(
+        "Phoenix starting\n"
+        "Enumerating serial ports...\n\n");
 
     phoenix::serial::WindowsSerialEnumerator enumerator;
 
     const auto ports = enumerator.enumerate();
 
-    std::cout
+    {
+        std::ostringstream message;
+
+        message
         << "Serial ports found: "
         << ports.size()
         << "\n\n";
 
+        phoenix::logging::info(message.str());
+    }
+
     if (ports.empty())
     {
-        std::cout
-            << "No serial ports were detected.\n"
-            << "Phoenix stopped\n";
+        phoenix::logging::info(
+            "No serial ports were detected.\n"
+            "Phoenix stopped");
 
         return 0;
     }
@@ -83,8 +94,8 @@ int main()
         printPortInformation(port, kind);
     }
 
-    std::cout
-        << "Beginning XPLPro device discovery...\n\n";
+    phoenix::logging::info(
+        "Beginning XPLPro device discovery...\n\n");
 
     phoenix::discovery::LegacyXplproProbe probe;
 
@@ -97,15 +108,22 @@ int main()
 
         if (kind == phoenix::serial::SerialDeviceKind::Bluetooth)
         {
-            std::cout
+            std::ostringstream message;
+
+            message
                 << "Skipping "
                 << port.portName
                 << " because it is classified as Bluetooth.\n\n";
 
+            phoenix::logging::info(message.str());
+
             continue;
         }
 
-        std::cout
+        {
+            std::ostringstream message;
+
+            message
             << "Probing "
             << port.portName
             << "...\n"
@@ -113,23 +131,30 @@ int main()
             << deviceKindName(kind)
             << '\n';
 
+            phoenix::logging::info(message.str());
+        }
+
         phoenix::serial::WindowsSerialTransport transport(
             port.portName,
             115200);
 
         if (!transport.open())
         {
-            std::cout
+            std::ostringstream message;
+
+            message
                 << "  Unable to open "
                 << port.portName
                 << ".\n\n";
 
+            phoenix::logging::warning(message.str());
+
             continue;
         }
 
-        std::cout
-            << "  Port opened successfully.\n"
-            << "  Sending XPLPro identity requests...\n";
+        phoenix::logging::info(
+            "  Port opened successfully.\n"
+            "  Sending XPLPro identity requests...\n");
 
         const auto device = probe.probe(transport);
 
@@ -137,31 +162,40 @@ int main()
         {
             ++devicesFound;
 
-            std::cout
+            std::ostringstream message;
+
+            message
                 << "  XPLPro device discovered.\n"
                 << "  Device name:    "
                 << device->name << '\n'
                 << "  Device version: "
                 << device->version << '\n';
+
+            phoenix::logging::info(message.str());
         }
         else
         {
-            std::cout
-                << "  No valid XPLPro response received.\n";
+            phoenix::logging::info(
+                "  No valid XPLPro response received.\n");
         }
 
         transport.close();
 
-        std::cout
-            << "  Port closed.\n\n";
+        phoenix::logging::info("  Port closed.\n\n");
     }
 
-    std::cout
+    {
+        std::ostringstream message;
+
+        message
         << "Discovery complete.\n"
         << "XPLPro devices found: "
         << devicesFound
         << '\n'
         << "Phoenix stopped\n";
+
+        phoenix::logging::info(message.str());
+    }
 
     return 0;
 }

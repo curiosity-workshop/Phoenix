@@ -1,4 +1,6 @@
 #include <phoenix/discovery/LegacyXplproProbe.h>
+#include <phoenix/protocol/legacy/LegacyFrame.h>
+#include <phoenix/protocol/legacy/LegacyFrameParser.h>
 
 #include <array>
 #include <chrono>
@@ -10,46 +12,28 @@ namespace phoenix::discovery
 {
     namespace
     {
-        constexpr char packetHeader = '[';
-        constexpr char packetTrailer = ']';
-
-        constexpr char sendNameCommand = 'N';
-
-        // Verify these against the legacy XPLPro command definitions.
-        constexpr char nameResponseCommand = 'n';
-        constexpr char versionResponseCommand = 'v';
-
-        constexpr std::size_t maximumFrameSize = 256;
-
-        std::array<std::byte, 3> makeIdentityRequest()
+        std::string extractQuotedString(std::string_view payload)
         {
-            return {
-                static_cast<std::byte>(packetHeader),
-                static_cast<std::byte>(sendNameCommand),
-                static_cast<std::byte>(packetTrailer)
-            };
-        }
+            const std::size_t firstQuote = payload.find('"');
 
-        std::string extractQuotedString(const std::string& frame)
-        {
-            const std::size_t firstQuote = frame.find('"');
-
-            if (firstQuote == std::string::npos)
+            if (firstQuote == std::string_view::npos)
             {
                 return {};
             }
 
             const std::size_t secondQuote =
-                frame.find('"', firstQuote + 1);
+                payload.find('"', firstQuote + 1);
 
-            if (secondQuote == std::string::npos)
+            if (secondQuote == std::string_view::npos)
             {
                 return {};
             }
 
-            return frame.substr(
+            return std::string{
+                payload.substr(
                 firstQuote + 1,
-                secondQuote - firstQuote - 1);
+                secondQuote - firstQuote - 1)
+            };
         }
     }
 
@@ -73,9 +57,11 @@ namespace phoenix::discovery
         DiscoveredDevice discoveredDevice;
 
         std::array<std::byte, 256> readBuffer{};
-        std::string receiveBuffer;
+        protocol::legacy::LegacyFrameParser parser;
 
-        const auto request = makeIdentityRequest();
+        const auto request =
+            protocol::legacy::makeFrame(
+                protocol::legacy::sendNameCommand);
 
         const auto startTime =
             std::chrono::steady_clock::now();
@@ -101,80 +87,27 @@ namespace phoenix::discovery
             const std::size_t bytesRead =
                 transport.read(readBuffer);
 
-            for (std::size_t index = 0;
-                index < bytesRead;
-                ++index)
+            const auto frames =
+                parser.push(
+                    std::span<const std::byte>{
+                        readBuffer.data(),
+                        bytesRead
+                    });
+
+            for (const auto& frame : frames)
             {
-                const char receivedCharacter =
-                    static_cast<char>(
-                        std::to_integer<unsigned char>(
-                            readBuffer[index]));
-
-                /*
-                 * Discard anything received before a packet header.
-                 */
-                if (receiveBuffer.empty())
+                if (frame.command ==
+                    protocol::legacy::nameResponseCommand)
                 {
-                    if (receivedCharacter == packetHeader)
-                    {
-                        receiveBuffer.push_back(
-                            receivedCharacter);
-                    }
-
-                    continue;
+                    discoveredDevice.name =
+                        extractQuotedString(frame.payload);
                 }
-
-                /*
-                 * A new header inside an unfinished frame means the
-                 * previous frame was incomplete. Start over using the
-                 * new header.
-                 */
-                if (receivedCharacter == packetHeader)
+                else if (frame.command ==
+                    protocol::legacy::versionResponseCommand)
                 {
-                    receiveBuffer.clear();
-                    receiveBuffer.push_back(receivedCharacter);
-                    continue;
+                    discoveredDevice.version =
+                        extractQuotedString(frame.payload);
                 }
-
-                receiveBuffer.push_back(receivedCharacter);
-
-                /*
-                 * An overlength packet is considered corrupt or
-                 * incomplete. Discard it and wait for another header.
-                 */
-                if (receiveBuffer.size() > maximumFrameSize)
-                {
-                    receiveBuffer.clear();
-                    continue;
-                }
-
-                if (receivedCharacter != packetTrailer)
-                {
-                    continue;
-                }
-
-                /*
-                 * A minimum valid legacy frame contains:
-                 *
-                 *     [ command ]
-                 */
-                if (receiveBuffer.size() >= 3)
-                {
-                    const char command = receiveBuffer[1];
-
-                    if (command == nameResponseCommand)
-                    {
-                        discoveredDevice.name =
-                            extractQuotedString(receiveBuffer);
-                    }
-                    else if (command == versionResponseCommand)
-                    {
-                        discoveredDevice.version =
-                            extractQuotedString(receiveBuffer);
-                    }
-                }
-
-                receiveBuffer.clear();
 
                 /*
                  * The name response is enough to prove that this is

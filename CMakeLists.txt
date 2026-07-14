@@ -11,6 +11,14 @@ add_executable(Phoenix
     # Application
     core/src/main.cpp
 
+    # Logging
+    core/src/logging/Log.cpp
+
+    # Protocol
+    core/src/protocol/legacy/LegacyFrame.cpp
+    core/src/protocol/legacy/LegacyFrameParser.cpp
+    core/src/protocol/legacy/LegacyMessage.cpp
+
     # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
     core/src/serial/WindowsSerialTransport.cpp
@@ -18,7 +26,7 @@ add_executable(Phoenix
 
     # Discovery
     core/src/discovery/LegacyXplproProbe.cpp
- "core/include/phoenix/serial/SerialDeviceKind.h" "core/include/phoenix/serial/SerialDeviceClassifier.h" "core/src/serial/SerialDeviceClassifier.cpp")    
+)
 
 target_include_directories(Phoenix
     PRIVATE
@@ -31,3 +39,22 @@ if(WIN32)
             Setupapi
     )
 endif()
+
+enable_testing()
+
+add_executable(PhoenixProtocolTests
+    tests/protocol/LegacyFrameParserTests.cpp
+    core/src/protocol/legacy/LegacyFrame.cpp
+    core/src/protocol/legacy/LegacyFrameParser.cpp
+    core/src/protocol/legacy/LegacyMessage.cpp
+)
+
+target_include_directories(PhoenixProtocolTests
+    PRIVATE
+        core/include
+)
+
+add_test(
+    NAME PhoenixProtocolTests
+    COMMAND PhoenixProtocolTests
+)
