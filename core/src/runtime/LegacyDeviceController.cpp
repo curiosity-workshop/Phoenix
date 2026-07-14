@@ -1,0 +1,378 @@
+#include <phoenix/runtime/LegacyDeviceController.h>
+
+#include <sstream>
+#include <variant>
+
+namespace phoenix::runtime
+{
+    namespace
+    {
+        int toXPlaneType(
+            protocol::legacy::DataRefValueType type)
+        {
+            using protocol::legacy::DataRefValueType;
+
+            switch (type)
+            {
+            case DataRefValueType::Int:
+                return xplane::DataRefTypeInt;
+
+            case DataRefValueType::Float:
+                return xplane::DataRefTypeFloat;
+
+            case DataRefValueType::IntArray:
+                return xplane::DataRefTypeIntArray;
+
+            case DataRefValueType::FloatArray:
+                return xplane::DataRefTypeFloatArray;
+
+            case DataRefValueType::String:
+                return xplane::DataRefTypeData;
+
+            default:
+                return xplane::DataRefTypeUnknown;
+            }
+        }
+
+        std::string responsePayload(int handle)
+        {
+            std::ostringstream payload;
+            payload << ',' << handle;
+            return payload.str();
+        }
+
+        std::string failedLookupPayload(std::string_view name)
+        {
+            std::ostringstream payload;
+            payload << ",-02,\"" << name << '"';
+            return payload.str();
+        }
+    }
+
+    LegacyDeviceController::LegacyDeviceController(
+        LegacyDeviceSession& session,
+        xplane::IXPlaneBridge& xplane)
+        : session_(session),
+        xplane_(xplane)
+    {
+    }
+
+    LegacyDeviceController::LegacyDeviceController(
+        LegacyDeviceSession& session,
+        xplane::IXPlaneBridge& xplane,
+        ILegacyDeviceObserver& observer)
+        : session_(session),
+        xplane_(xplane),
+        observer_(&observer)
+    {
+    }
+
+    LegacyDeviceControllerTickResult LegacyDeviceController::tick()
+    {
+        LegacyDeviceControllerTickResult result;
+        result.session = session_.tick();
+
+        for (const auto& message : result.session.messages)
+        {
+            processMessage(message);
+            ++result.messagesProcessed;
+        }
+
+        result.responseBytesWritten =
+            session_.flushPendingOutput();
+
+        return result;
+    }
+
+    void LegacyDeviceController::requestRegistrations()
+    {
+        session_.queueFrame(
+            protocol::legacy::sendRequestCommand);
+
+        registrationsRequested_ = true;
+    }
+
+    const std::vector<LegacyDataRefBinding>&
+        LegacyDeviceController::dataRefs() const
+    {
+        return dataRefs_;
+    }
+
+    const std::vector<LegacyCommandBinding>&
+        LegacyDeviceController::commands() const
+    {
+        return commands_;
+    }
+
+    const std::vector<LegacyUpdateSubscription>&
+        LegacyDeviceController::updateSubscriptions() const
+    {
+        return updateSubscriptions_;
+    }
+
+    bool LegacyDeviceController::registrationsRequested() const
+    {
+        return registrationsRequested_;
+    }
+
+    bool LegacyDeviceController::dataFlowPaused() const
+    {
+        return dataFlowPaused_;
+    }
+
+    long LegacyDeviceController::maxBytesPerSecond() const
+    {
+        return maxBytesPerSecond_;
+    }
+
+    void LegacyDeviceController::processMessage(
+        const protocol::legacy::LegacyMessage& message)
+    {
+        std::visit(
+            [this](const auto& value)
+            {
+                using Message = std::decay_t<decltype(value)>;
+
+                if constexpr (std::is_same_v<Message, protocol::legacy::RegisterDataRef>)
+                {
+                    handleRegisterDataRef(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::RegisterCommand>)
+                {
+                    handleRegisterCommand(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::DataRefUpdate>)
+                {
+                    handleDataRefUpdate(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::UpdatesRequest>)
+                {
+                    handleUpdatesRequest(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::ScalingRequest>)
+                {
+                    handleScalingRequest(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::CommandEvent>)
+                {
+                    handleCommandEvent(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::DataRefTouch>)
+                {
+                    if (const auto* binding = findDataRef(value.handle))
+                    {
+                        xplane_.touchDataRef(binding->name, binding->handle);
+                    }
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::DataFlowPause>)
+                {
+                    dataFlowPaused_ = true;
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::DataFlowResume>)
+                {
+                    dataFlowPaused_ = false;
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::SetDataFlowSpeed>)
+                {
+                    maxBytesPerSecond_ = value.bytesPerSecond;
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::DebugMessage>)
+                {
+                    xplane_.debugMessage(value.value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::SpeakMessage>)
+                {
+                    xplane_.speak(value.value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::ResetRequest>)
+                {
+                    xplane_.resetRequested();
+                }
+            },
+            message);
+    }
+
+    void LegacyDeviceController::handleRegisterDataRef(
+        const protocol::legacy::RegisterDataRef& message)
+    {
+        if (observer_ != nullptr)
+        {
+            observer_->microcontrollerRequestedDataRef(
+                message.name);
+        }
+
+        const auto lookup = xplane_.findDataRef(message.name);
+
+        if (!lookup.found)
+        {
+            session_.queueFrame(
+                protocol::legacy::dataRefResponseCommand,
+                failedLookupPayload(message.name));
+            return;
+        }
+
+        const int handle =
+            static_cast<int>(dataRefs_.size());
+
+        dataRefs_.push_back({
+            handle,
+            message.name,
+            lookup.type,
+            true
+        });
+
+        session_.queueFrame(
+            protocol::legacy::dataRefResponseCommand,
+            responsePayload(handle));
+    }
+
+    void LegacyDeviceController::handleRegisterCommand(
+        const protocol::legacy::RegisterCommand& message)
+    {
+        if (observer_ != nullptr)
+        {
+            observer_->microcontrollerRequestedCommand(
+                message.name);
+        }
+
+        const auto lookup = xplane_.findCommand(message.name);
+
+        if (!lookup.found)
+        {
+            session_.queueFrame(
+                protocol::legacy::commandResponseCommand,
+                failedLookupPayload(message.name));
+            return;
+        }
+
+        const int handle =
+            static_cast<int>(commands_.size());
+
+        commands_.push_back({
+            handle,
+            message.name,
+            true
+        });
+
+        session_.queueFrame(
+            protocol::legacy::commandResponseCommand,
+            responsePayload(handle));
+    }
+
+    void LegacyDeviceController::handleDataRefUpdate(
+        const protocol::legacy::DataRefUpdate& message)
+    {
+        const auto* binding = findDataRef(message.handle);
+
+        if (binding == nullptr)
+        {
+            return;
+        }
+
+        xplane_.writeDataRef({
+            binding->name,
+            binding->handle,
+            toXPlaneType(message.type),
+            message.value,
+            message.element
+        });
+    }
+
+    void LegacyDeviceController::handleUpdatesRequest(
+        const protocol::legacy::UpdatesRequest& message)
+    {
+        if (observer_ != nullptr)
+        {
+            observer_->microcontrollerRequestedUpdates(message);
+        }
+
+        if (findDataRef(message.handle) == nullptr)
+        {
+            return;
+        }
+
+        updateSubscriptions_.push_back({
+            message.handle,
+            message.requestedType,
+            message.rate,
+            message.precision,
+            message.element,
+            true
+        });
+    }
+
+    void LegacyDeviceController::handleScalingRequest(
+        const protocol::legacy::ScalingRequest& message)
+    {
+        if (observer_ != nullptr)
+        {
+            observer_->microcontrollerRequestedScaling(message);
+        }
+
+        auto* binding = findDataRef(message.handle);
+
+        if (binding == nullptr)
+        {
+            return;
+        }
+
+        binding->scalingActive = true;
+        binding->scaleFromLow = message.fromLow;
+        binding->scaleFromHigh = message.fromHigh;
+        binding->scaleToLow = message.toLow;
+        binding->scaleToHigh = message.toHigh;
+    }
+
+    void LegacyDeviceController::handleCommandEvent(
+        const protocol::legacy::CommandEvent& message)
+    {
+        const auto* binding = findCommand(message.handle);
+
+        if (binding == nullptr)
+        {
+            return;
+        }
+
+        switch (message.action)
+        {
+        case protocol::legacy::CommandAction::Start:
+            xplane_.commandBegin(binding->name, binding->handle);
+            break;
+
+        case protocol::legacy::CommandAction::End:
+            xplane_.commandEnd(binding->name, binding->handle);
+            break;
+
+        case protocol::legacy::CommandAction::Trigger:
+            xplane_.commandTrigger(
+                binding->name,
+                binding->handle,
+                message.triggerCount);
+            break;
+        }
+    }
+
+    LegacyDataRefBinding* LegacyDeviceController::findDataRef(
+        int handle)
+    {
+        if (handle < 0 ||
+            static_cast<std::size_t>(handle) >= dataRefs_.size())
+        {
+            return nullptr;
+        }
+
+        return &dataRefs_[static_cast<std::size_t>(handle)];
+    }
+
+    LegacyCommandBinding* LegacyDeviceController::findCommand(
+        int handle)
+    {
+        if (handle < 0 ||
+            static_cast<std::size_t>(handle) >= commands_.size())
+        {
+            return nullptr;
+        }
+
+        return &commands_[static_cast<std::size_t>(handle)];
+    }
+}

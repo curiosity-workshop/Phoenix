@@ -19,6 +19,10 @@ add_executable(Phoenix
     core/src/protocol/legacy/LegacyFrameParser.cpp
     core/src/protocol/legacy/LegacyMessage.cpp
 
+    # Runtime
+    core/src/runtime/LegacyDeviceController.cpp
+    core/src/runtime/LegacyDeviceSession.cpp
+
     # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
     core/src/serial/WindowsSerialTransport.cpp
@@ -57,4 +61,41 @@ target_include_directories(PhoenixProtocolTests
 add_test(
     NAME PhoenixProtocolTests
     COMMAND PhoenixProtocolTests
+)
+
+add_executable(PhoenixRuntimeTests
+    tests/runtime/LegacyDeviceSessionTests.cpp
+    core/src/protocol/legacy/LegacyFrame.cpp
+    core/src/protocol/legacy/LegacyFrameParser.cpp
+    core/src/protocol/legacy/LegacyMessage.cpp
+    core/src/runtime/LegacyDeviceSession.cpp
+)
+
+target_include_directories(PhoenixRuntimeTests
+    PRIVATE
+        core/include
+)
+
+add_test(
+    NAME PhoenixRuntimeTests
+    COMMAND PhoenixRuntimeTests
+)
+
+add_executable(PhoenixDeviceControllerTests
+    tests/runtime/LegacyDeviceControllerTests.cpp
+    core/src/protocol/legacy/LegacyFrame.cpp
+    core/src/protocol/legacy/LegacyFrameParser.cpp
+    core/src/protocol/legacy/LegacyMessage.cpp
+    core/src/runtime/LegacyDeviceController.cpp
+    core/src/runtime/LegacyDeviceSession.cpp
+)
+
+target_include_directories(PhoenixDeviceControllerTests
+    PRIVATE
+        core/include
+)
+
+add_test(
+    NAME PhoenixDeviceControllerTests
+    COMMAND PhoenixDeviceControllerTests
 )
