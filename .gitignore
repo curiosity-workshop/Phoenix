@@ -27,6 +27,9 @@ x86/
 *.pdb
 *.ilk
 
+# Runtime logs
+PhoenixSerial.log
+
 # OS
 Thumbs.db
 .DS_Store

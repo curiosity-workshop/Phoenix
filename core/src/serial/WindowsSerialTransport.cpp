@@ -97,8 +97,8 @@ namespace phoenix::serial
         configuration.fOutX = FALSE;
         configuration.fInX = FALSE;
 
-        configuration.fDtrControl = DTR_CONTROL_ENABLE;
-        configuration.fRtsControl = RTS_CONTROL_ENABLE;
+        configuration.fDtrControl = DTR_CONTROL_DISABLE;
+        configuration.fRtsControl = RTS_CONTROL_DISABLE;
 
         configuration.fAbortOnError = FALSE;
 

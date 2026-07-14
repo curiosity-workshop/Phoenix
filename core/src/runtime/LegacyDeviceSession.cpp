@@ -1,5 +1,6 @@
 #include <phoenix/runtime/LegacyDeviceSession.h>
 
+#include <phoenix/logging/Log.h>
 #include <phoenix/protocol/legacy/LegacyFrame.h>
 
 #include <algorithm>
@@ -93,6 +94,17 @@ namespace phoenix::runtime
             const std::size_t bytesToRemove =
                 std::min(bytesWritten, outgoing_.size());
 
+            if (options_.serialTrace != nullptr)
+            {
+                options_.serialTrace->bytes(
+                    logging::ByteDumpDirection::Transmit,
+                    options_.tracePortName,
+                    std::span<const std::byte>{
+                        contiguous.data(),
+                        bytesToRemove
+                    });
+            }
+
             for (std::size_t index = 0;
                 index < bytesToRemove;
                 ++index)
@@ -125,6 +137,17 @@ namespace phoenix::runtime
             }
 
             totalBytesRead += bytesRead;
+
+            if (options_.serialTrace != nullptr)
+            {
+                options_.serialTrace->bytes(
+                    logging::ByteDumpDirection::Receive,
+                    options_.tracePortName,
+                    std::span<const std::byte>{
+                        readBuffer.data(),
+                        bytesRead
+                    });
+            }
 
             const auto frames =
                 parser_.push(

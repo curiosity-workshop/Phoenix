@@ -1,13 +1,21 @@
 #pragma once
 
 #include <phoenix/discovery/DiscoveredDevice.h>
+#include <phoenix/logging/SerialTraceLogger.h>
 #include <phoenix/transport/IByteTransport.h>
 
 #include <chrono>
 #include <optional>
+#include <string_view>
 
 namespace phoenix::discovery
 {
+    struct LegacyXplproProbeTrace
+    {
+        logging::ISerialTraceSink* serialTrace = nullptr;
+        std::string_view portName;
+    };
+
     class LegacyXplproProbe
     {
     public:
@@ -18,7 +26,8 @@ namespace phoenix::discovery
             std::chrono::seconds{ 4 });
 
         std::optional<DiscoveredDevice> probe(
-            transport::IByteTransport& transport) const;
+            transport::IByteTransport& transport,
+            LegacyXplproProbeTrace trace = {}) const;
 
     private:
         std::chrono::milliseconds retryInterval_;

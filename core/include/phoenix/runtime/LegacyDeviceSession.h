@@ -1,5 +1,6 @@
 #pragma once
 
+#include <phoenix/logging/SerialTraceLogger.h>
 #include <phoenix/protocol/legacy/LegacyFrameParser.h>
 #include <phoenix/protocol/legacy/LegacyMessage.h>
 #include <phoenix/transport/IByteTransport.h>
@@ -7,6 +8,7 @@
 #include <cstddef>
 #include <deque>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -16,6 +18,8 @@ namespace phoenix::runtime
     {
         std::size_t readBufferSize = 256;
         std::size_t maximumReadPasses = 16;
+        logging::ISerialTraceSink* serialTrace = nullptr;
+        std::string tracePortName;
     };
 
     struct LegacyDeviceSessionTickResult

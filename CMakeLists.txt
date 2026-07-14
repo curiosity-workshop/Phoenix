@@ -10,9 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(Phoenix
     # Application
     core/src/main.cpp
+    core/src/dev/DevelopmentDeviceLoop.cpp
 
     # Logging
     core/src/logging/Log.cpp
+    core/src/logging/SerialTraceLogger.cpp
 
     # Protocol
     core/src/protocol/legacy/LegacyFrame.cpp
@@ -35,6 +37,11 @@ add_executable(Phoenix
 target_include_directories(Phoenix
     PRIVATE
         core/include
+)
+
+target_compile_definitions(Phoenix
+    PRIVATE
+        PHOENIX_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 if(WIN32)
@@ -65,6 +72,7 @@ add_test(
 
 add_executable(PhoenixRuntimeTests
     tests/runtime/LegacyDeviceSessionTests.cpp
+    core/src/logging/SerialTraceLogger.cpp
     core/src/protocol/legacy/LegacyFrame.cpp
     core/src/protocol/legacy/LegacyFrameParser.cpp
     core/src/protocol/legacy/LegacyMessage.cpp
@@ -83,6 +91,7 @@ add_test(
 
 add_executable(PhoenixDeviceControllerTests
     tests/runtime/LegacyDeviceControllerTests.cpp
+    core/src/logging/SerialTraceLogger.cpp
     core/src/protocol/legacy/LegacyFrame.cpp
     core/src/protocol/legacy/LegacyFrameParser.cpp
     core/src/protocol/legacy/LegacyMessage.cpp

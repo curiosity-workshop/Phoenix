@@ -47,7 +47,8 @@ namespace phoenix::discovery
 
     std::optional<DiscoveredDevice>
         LegacyXplproProbe::probe(
-            transport::IByteTransport& transport) const
+            transport::IByteTransport& transport,
+            LegacyXplproProbeTrace trace) const
     {
         if (!transport.isOpen())
         {
@@ -78,7 +79,20 @@ namespace phoenix::discovery
 
             if (currentTime >= nextRequestTime)
             {
-                transport.write(request);
+                const std::size_t bytesWritten =
+                    transport.write(request);
+
+                if (trace.serialTrace != nullptr &&
+                    bytesWritten > 0)
+                {
+                    trace.serialTrace->bytes(
+                        logging::ByteDumpDirection::Transmit,
+                        trace.portName,
+                        std::span<const std::byte>{
+                            request.data(),
+                            bytesWritten
+                        });
+                }
 
                 nextRequestTime =
                     currentTime + retryInterval_;
@@ -86,6 +100,18 @@ namespace phoenix::discovery
 
             const std::size_t bytesRead =
                 transport.read(readBuffer);
+
+            if (trace.serialTrace != nullptr &&
+                bytesRead > 0)
+            {
+                trace.serialTrace->bytes(
+                    logging::ByteDumpDirection::Receive,
+                    trace.portName,
+                    std::span<const std::byte>{
+                        readBuffer.data(),
+                        bytesRead
+                    });
+            }
 
             const auto frames =
                 parser.push(
