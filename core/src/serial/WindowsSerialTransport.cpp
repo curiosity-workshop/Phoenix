@@ -1,5 +1,4 @@
 #include <phoenix/serial/WindowsSerialTransport.h>
-#include <Windows.h>
 #include <algorithm>
 #include <limits>
 #include <utility>
