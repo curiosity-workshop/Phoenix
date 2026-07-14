@@ -8,10 +8,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(Phoenix
+    # Application
     core/src/main.cpp
+
+    # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
     core/src/serial/WindowsSerialTransport.cpp
-)
+
+    # Discovery
+    core/src/discovery/LegacyXplproProbe.cpp
+)    
 
 target_include_directories(Phoenix
     PRIVATE
