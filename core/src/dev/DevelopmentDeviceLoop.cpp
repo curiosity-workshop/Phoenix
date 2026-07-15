@@ -399,4 +399,9 @@ namespace phoenix::dev
     {
         implementation_->runtime.runFor(duration);
     }
+
+    std::size_t DevelopmentDeviceManager::disengageDevices()
+    {
+        return implementation_->runtime.disengageDevices();
+    }
 }

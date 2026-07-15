@@ -429,6 +429,13 @@ int main()
             DataRefTypeFloat,
             true
         });
+        profile.dataRefs[0].updates.push_back({
+            0,
+            DataRefTypeFloat,
+            250,
+            "0.0100",
+            std::nullopt
+        });
         profile.commands.push_back({
             0,
             "sim/profile/command",
@@ -447,6 +454,12 @@ int main()
         passed &= expect(
             profileController.commands().size() == 1,
             "profile command should be retained");
+        passed &= expect(
+            profileController.updateSubscriptions().size() == 1,
+            "profile update subscription should be retained");
+        passed &= expect(
+            profileController.updateSubscriptions()[0].rate == 250,
+            "profile update subscription rate should be retained");
 
         profileTransport.pushIncoming("[r,0,100,0.0000]");
         auto profileTick = profileController.tick();
@@ -455,7 +468,7 @@ int main()
             profileTick.messagesProcessed == 1,
             "profile update request should process");
         passed &= expect(
-            profileController.updateSubscriptions().size() == 1,
+            profileController.updateSubscriptions().size() == 2,
             "profile update request should be retained");
 
         profileTransport.pushIncoming("[b,\"sim/profile/dataref\"]");

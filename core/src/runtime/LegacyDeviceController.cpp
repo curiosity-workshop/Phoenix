@@ -130,6 +130,7 @@ namespace phoenix::runtime
     {
         std::vector<LegacyDataRefBinding> dataRefs;
         std::vector<LegacyCommandBinding> commands;
+        std::vector<LegacyUpdateSubscription> updateSubscriptions;
 
         for (const auto& profileDataRef : profile.dataRefs)
         {
@@ -151,8 +152,32 @@ namespace phoenix::runtime
                 profileDataRef.handle,
                 profileDataRef.name,
                 lookup.type,
-                true
+                profileDataRef.active,
+                profileDataRef.scalingActive,
+                profileDataRef.scaleFromLow,
+                profileDataRef.scaleFromHigh,
+                profileDataRef.scaleToLow,
+                profileDataRef.scaleToHigh
             });
+
+            for (const auto& profileUpdate :
+                profileDataRef.updates)
+            {
+                if (profileUpdate.handle !=
+                    profileDataRef.handle)
+                {
+                    return false;
+                }
+
+                updateSubscriptions.push_back({
+                    profileUpdate.handle,
+                    profileUpdate.requestedType,
+                    profileUpdate.rate,
+                    profileUpdate.precision,
+                    profileUpdate.element,
+                    true
+                });
+            }
         }
 
         for (const auto& profileCommand : profile.commands)
@@ -174,13 +199,13 @@ namespace phoenix::runtime
             commands.push_back({
                 profileCommand.handle,
                 profileCommand.name,
-                true
+                profileCommand.active
             });
         }
 
         dataRefs_ = std::move(dataRefs);
         commands_ = std::move(commands);
-        updateSubscriptions_.clear();
+        updateSubscriptions_ = std::move(updateSubscriptions);
         profilePreloaded_ = true;
 
         return true;

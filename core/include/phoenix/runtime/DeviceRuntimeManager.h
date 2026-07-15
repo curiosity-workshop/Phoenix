@@ -79,7 +79,12 @@ namespace phoenix::runtime
 
         void saveProfiles() const;
 
+        std::size_t disengageDevices();
+
         std::size_t deviceCount() const;
+        std::size_t dataRefCount() const;
+        std::size_t commandCount() const;
+        std::size_t updateSubscriptionCount() const;
 
     private:
         logging::ISerialTraceSink& serialTrace_;

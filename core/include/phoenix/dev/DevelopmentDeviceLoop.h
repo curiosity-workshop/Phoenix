@@ -42,6 +42,8 @@ namespace phoenix::dev
         void runFor(
             std::chrono::steady_clock::duration duration);
 
+        std::size_t disengageDevices();
+
     private:
         struct Implementation;
 

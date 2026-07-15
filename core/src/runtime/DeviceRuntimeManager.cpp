@@ -462,8 +462,82 @@ namespace phoenix::runtime
         }
     }
 
+    std::size_t DeviceRuntimeManager::disengageDevices()
+    {
+        const std::size_t count =
+            devices_.size();
+
+        if (count == 0)
+        {
+            return 0;
+        }
+
+        saveProfiles();
+
+        for (auto& device : devices_)
+        {
+            if (device->session && device->transport &&
+                device->transport->isOpen())
+            {
+                device->session->queueFrame(
+                    protocol::legacy::exitingCommand);
+                device->session->flushPendingOutput();
+                device->transport->close();
+            }
+        }
+
+        devices_.clear();
+
+        std::ostringstream message;
+
+        message
+            << "  Disengaged "
+            << count
+            << " device(s).\n";
+
+        logging::info(message.str());
+
+        return count;
+    }
+
     std::size_t DeviceRuntimeManager::deviceCount() const
     {
         return devices_.size();
+    }
+
+    std::size_t DeviceRuntimeManager::dataRefCount() const
+    {
+        std::size_t count = 0;
+
+        for (const auto& device : devices_)
+        {
+            count += device->controller->dataRefs().size();
+        }
+
+        return count;
+    }
+
+    std::size_t DeviceRuntimeManager::commandCount() const
+    {
+        std::size_t count = 0;
+
+        for (const auto& device : devices_)
+        {
+            count += device->controller->commands().size();
+        }
+
+        return count;
+    }
+
+    std::size_t DeviceRuntimeManager::updateSubscriptionCount() const
+    {
+        std::size_t count = 0;
+
+        for (const auto& device : devices_)
+        {
+            count += device->controller->updateSubscriptions().size();
+        }
+
+        return count;
     }
 }
