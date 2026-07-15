@@ -1,6 +1,6 @@
-#include <PhoenixXPL.h>
+#include <XPLLink.h>
 
-phoenix::PhoenixXPL XP(Serial);
+phoenix::XPLLink XP(Serial);
 
 void setup()
 {

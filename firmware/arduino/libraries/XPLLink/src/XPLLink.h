@@ -4,10 +4,10 @@
 
 namespace phoenix
 {
-    class PhoenixXPL
+    class XPLLink
     {
     public:
-        explicit PhoenixXPL(Stream& stream);
+        explicit XPLLink(Stream& stream);
 
         void begin(const char* deviceName);
         void loop();
