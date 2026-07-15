@@ -5,7 +5,7 @@ phoenix::XPLLink XP(Serial);
 void setup()
 {
     Serial.begin(115200);
-    XP.begin("Phoenix Basic Serial");
+    XP.begin("XPLLink Basic Serial");
 }
 
 void loop()
