@@ -26,7 +26,6 @@ namespace phoenix::protocol::legacy
 
     struct IdentityRequest {};
     struct RegistrationRequest {};
-    struct NoMoreRequests {};
     struct DataFlowPause {};
     struct DataFlowResume {};
     struct ResetRequest {};
@@ -131,7 +130,6 @@ namespace phoenix::protocol::legacy
     using LegacyMessage = std::variant<
         IdentityRequest,
         RegistrationRequest,
-        NoMoreRequests,
         DataFlowPause,
         DataFlowResume,
         ResetRequest,

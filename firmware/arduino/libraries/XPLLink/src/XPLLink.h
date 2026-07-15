@@ -62,12 +62,6 @@ typedef int XPLMCommandButtonID;
 #define XPLREQUEST_UPDATESARRAY 't'
 #define XPLREQUEST_UPDATES_TYPE 'y'
 #define XPLREQUEST_UPDATES_TYPE_ARRAY 'w'
-#define XPLCMD_SPECIAL '$'
-#define XPLCMD_SPECIAL_SIMKEYPRESS 1
-#define XPLCMD_SPECIAL_CMDKEYSTROKE 2
-#define XPLCMD_SPECIAL_CMDBUTTONPRESS 3
-#define XPLCMD_SPECIAL_CMDBUTTONRELEASE 4
-
 #define xplmType_Unknown 0
 #define xplmType_Int 1
 #define xplmType_Float 2
@@ -122,11 +116,6 @@ namespace phoenix
         int commandTrigger(cmd_handle commandHandle, int triggerCount);
         int commandStart(cmd_handle commandHandle);
         int commandEnd(cmd_handle commandHandle);
-
-        void simulateKeyPress(int keyType, int key);
-        void commandKeyStroke(XPLMCommandKeyID key);
-        void commandButtonPress(XPLMCommandButtonID button);
-        void commandButtonRelease(XPLMCommandButtonID button);
 
         void datarefWrite(dref_handle handle, int value);
         void datarefWrite(dref_handle handle, long value);

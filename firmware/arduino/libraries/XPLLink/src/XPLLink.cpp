@@ -113,59 +113,6 @@ namespace phoenix
         return 0;
     }
 
-    void XPLLink::simulateKeyPress(int keyType, int key)
-    {
-        sprintf(
-            sendBuffer_,
-            "%c%c,%i,%i,%i%c",
-            XPL_PACKETHEADER,
-            XPLCMD_SPECIAL,
-            XPLCMD_SPECIAL_SIMKEYPRESS,
-            keyType,
-            key,
-            XPL_PACKETTRAILER);
-        transmitPacket();
-    }
-
-    void XPLLink::commandKeyStroke(XPLMCommandKeyID key)
-    {
-        sprintf(
-            sendBuffer_,
-            "%c%c,%i,%i%c",
-            XPL_PACKETHEADER,
-            XPLCMD_SPECIAL,
-            XPLCMD_SPECIAL_CMDKEYSTROKE,
-            key,
-            XPL_PACKETTRAILER);
-        transmitPacket();
-    }
-
-    void XPLLink::commandButtonPress(XPLMCommandButtonID button)
-    {
-        sprintf(
-            sendBuffer_,
-            "%c%c,%i,%i%c",
-            XPL_PACKETHEADER,
-            XPLCMD_SPECIAL,
-            XPLCMD_SPECIAL_CMDBUTTONPRESS,
-            button,
-            XPL_PACKETTRAILER);
-        transmitPacket();
-    }
-
-    void XPLLink::commandButtonRelease(XPLMCommandButtonID button)
-    {
-        sprintf(
-            sendBuffer_,
-            "%c%c,%i,%i%c",
-            XPL_PACKETHEADER,
-            XPLCMD_SPECIAL,
-            XPLCMD_SPECIAL_CMDBUTTONRELEASE,
-            button,
-            XPL_PACKETTRAILER);
-        transmitPacket();
-    }
-
     int XPLLink::sendDebugMessage(const char* message)
     {
         sendPacketString(XPLCMD_PRINTDEBUG, message);

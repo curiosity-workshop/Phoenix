@@ -5,6 +5,7 @@
 #include <phoenix/protocol/legacy/LegacyFrame.h>
 #include <phoenix/runtime/LegacyDeviceController.h>
 #include <phoenix/runtime/LegacyDeviceSession.h>
+#include <phoenix/runtime/LegacyUpdateScheduler.h>
 #include <phoenix/xplane/IXPlaneBridge.h>
 
 #include <chrono>
@@ -82,6 +83,51 @@ namespace phoenix::dev
                 message << '\n';
 
                 logging::info(message.str());
+            }
+
+            xplane::DataRefReadResult readDataRef(
+                const xplane::DataRefReadRequest& request) override
+            {
+                const auto now =
+                    std::chrono::steady_clock::now().time_since_epoch();
+                const auto seconds =
+                    std::chrono::duration_cast<std::chrono::seconds>(now);
+                const bool state =
+                    (seconds.count() / 2) % 2 == 0;
+
+                const int valueType =
+                    request.preferredType.value_or(xplane::DataRefTypeInt);
+
+                if (valueType == xplane::DataRefTypeFloat ||
+                    valueType == xplane::DataRefTypeDouble ||
+                    valueType == xplane::DataRefTypeFloatArray)
+                {
+                    return {
+                        true,
+                        valueType,
+                        state ? "1.0000" : "0.0000",
+                        request.element
+                    };
+                }
+
+                if (valueType == xplane::DataRefTypeData)
+                {
+                    return {
+                        true,
+                        valueType,
+                        state ? "1" : "0",
+                        request.element
+                    };
+                }
+
+                return {
+                    true,
+                    request.element ?
+                        xplane::DataRefTypeIntArray :
+                        xplane::DataRefTypeInt,
+                    state ? "1" : "0",
+                    request.element
+                };
             }
 
             void touchDataRef(
@@ -297,6 +343,15 @@ namespace phoenix::dev
                     *session,
                     xplane,
                     observer))
+            , updateScheduler(
+                std::make_unique<runtime::LegacyUpdateScheduler>(
+                    *session,
+                    *controller,
+                    xplane,
+                    runtime::LegacyUpdateSchedulerOptions{
+                        .maxFramesPerTick = 8,
+                        .maxBytesPerTick = 64
+                    }))
         {
         }
 
@@ -316,10 +371,8 @@ namespace phoenix::dev
         DevelopmentLegacyDeviceObserver observer;
         std::unique_ptr<runtime::LegacyDeviceSession> session;
         std::unique_ptr<runtime::LegacyDeviceController> controller;
+        std::unique_ptr<runtime::LegacyUpdateScheduler> updateScheduler;
         bool profileAccepted = false;
-        bool emulatedDataRefState = true;
-        std::chrono::steady_clock::time_point nextToggleTime =
-            std::chrono::steady_clock::now();
     };
 
     namespace
@@ -353,87 +406,34 @@ namespace phoenix::dev
             logging::info(message.str());
         }
 
-        void sendEmulatedDataRefUpdates(
+        void logUpdateSchedulerActivity(
             DevelopmentDeviceManager::DeviceContext& device,
-            std::chrono::steady_clock::time_point now)
+            const runtime::LegacyUpdateSchedulerTickResult& tick)
         {
-            if (device.controller->updateSubscriptions().empty() ||
-                now < device.nextToggleTime)
+            if (tick.updatesQueued == 0 && tick.bytesWritten == 0)
             {
                 return;
             }
 
-            for (const auto& subscription :
-                device.controller->updateSubscriptions())
+            std::ostringstream message;
+
+            message
+                << "    "
+                << device.portName
+                << " update scheduler: queued "
+                << tick.updatesQueued
+                << " update(s), wrote "
+                << tick.bytesWritten
+                << " byte(s)";
+
+            if (tick.budgetExhausted)
             {
-                std::ostringstream payload;
-
-                payload
-                    << ','
-                    << subscription.handle
-                    << ','
-                    << (device.emulatedDataRefState ? 1 : 0);
-
-                if (subscription.element)
-                {
-                    payload
-                        << ','
-                        << *subscription.element;
-
-                    device.session->queueFrame(
-                        protocol::legacy::dataRefUpdateIntArrayCommand,
-                        payload.str());
-                }
-                else
-                {
-                    device.session->queueFrame(
-                        protocol::legacy::dataRefUpdateIntCommand,
-                        payload.str());
-                }
-
-                std::ostringstream message;
-
-                message
-                    << "    "
-                    << device.portName
-                    << " X-Plane emulator sent dataref handle "
-                    << subscription.handle
-                    << " = "
-                    << (device.emulatedDataRefState ? 1 : 0);
-
-                if (subscription.element)
-                {
-                    message
-                        << " element "
-                        << *subscription.element;
-                }
-
-                message << '\n';
-
-                logging::info(message.str());
+                message << ", budget exhausted";
             }
 
-            const std::size_t bytesWritten =
-                device.session->flushPendingOutput();
+            message << ".\n";
 
-            if (bytesWritten > 0)
-            {
-                std::ostringstream message;
-
-                message
-                    << "    "
-                    << device.portName
-                    << " tick: emulator wrote "
-                    << bytesWritten
-                    << " data update byte(s).\n";
-
-                logging::info(message.str());
-            }
-
-            device.emulatedDataRefState =
-                !device.emulatedDataRefState;
-            device.nextToggleTime =
-                now + std::chrono::seconds{ 2 };
+            logging::info(message.str());
         }
 
         profile::DeviceProfile buildProfile(
@@ -648,8 +648,6 @@ namespace phoenix::dev
             *device);
 
         device->controller->requestRegistrations();
-        device->nextToggleTime =
-            std::chrono::steady_clock::now();
 
         devices_.push_back(std::move(device));
     }
@@ -693,7 +691,11 @@ namespace phoenix::dev
                     device->controller->tick();
 
                 logTickActivity(*device, tick);
-                sendEmulatedDataRefUpdates(*device, now);
+
+                const auto updateTick =
+                    device->updateScheduler->tick(now);
+
+                logUpdateSchedulerActivity(*device, updateTick);
             }
 
             std::this_thread::sleep_for(

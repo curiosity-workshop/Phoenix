@@ -112,8 +112,8 @@ int main()
         "Beginning XPLPro device discovery...\n\n");
 
     phoenix::discovery::LegacyXplproProbe probe{
-        std::chrono::milliseconds{ 250 },
-        std::chrono::seconds{ 12 }
+        std::chrono::milliseconds{ 50 },
+        std::chrono::seconds{ 2 }
     };
     const auto serialTracePath =
         sourceRoot() / "PhoenixSerial.log";
@@ -158,14 +158,17 @@ int main()
         const auto kind =
             phoenix::serial::SerialDeviceClassifier::classify(port);
 
-        if (kind == phoenix::serial::SerialDeviceKind::Bluetooth)
+        if (kind == phoenix::serial::SerialDeviceKind::Bluetooth ||
+            kind == phoenix::serial::SerialDeviceKind::BuiltInSerial)
         {
             std::ostringstream message;
 
             message
                 << "Skipping "
                 << port.portName
-                << " because it is classified as Bluetooth.\n\n";
+                << " because it is classified as "
+                << deviceKindName(kind)
+                << ".\n\n";
 
             phoenix::logging::info(message.str());
 

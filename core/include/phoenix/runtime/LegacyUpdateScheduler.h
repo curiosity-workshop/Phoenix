@@ -1,0 +1,77 @@
+#pragma once
+
+#include <phoenix/runtime/LegacyDeviceController.h>
+#include <phoenix/runtime/LegacyDeviceSession.h>
+#include <phoenix/xplane/IXPlaneBridge.h>
+
+#include <chrono>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace phoenix::runtime
+{
+    struct LegacyUpdateSchedulerTickResult
+    {
+        std::size_t updatesQueued = 0;
+        std::size_t bytesWritten = 0;
+        bool budgetExhausted = false;
+    };
+
+    struct LegacyUpdateSchedulerOptions
+    {
+        std::size_t maxFramesPerTick = 0;
+        std::size_t maxBytesPerTick = 0;
+    };
+
+    class LegacyUpdateScheduler
+    {
+    public:
+        LegacyUpdateScheduler(
+            LegacyDeviceSession& session,
+            const LegacyDeviceController& controller,
+            xplane::IXPlaneBridge& xplane,
+            LegacyUpdateSchedulerOptions options = {});
+
+        LegacyUpdateSchedulerTickResult tick(
+            std::chrono::steady_clock::time_point now);
+
+    private:
+        struct SubscriptionState
+        {
+            int handle = -1;
+            std::optional<int> requestedType;
+            std::optional<int> element;
+            std::chrono::steady_clock::time_point nextDue{};
+            bool hasSentValue = false;
+            std::string lastValue;
+        };
+
+        const LegacyDataRefBinding* findDataRef(int handle) const;
+        SubscriptionState& stateFor(
+            const LegacyUpdateSubscription& subscription,
+            std::chrono::steady_clock::time_point now);
+        bool shouldSend(
+            const LegacyUpdateSubscription& subscription,
+            const SubscriptionState& state,
+            const xplane::DataRefReadResult& value) const;
+        struct QueuedUpdate
+        {
+            std::vector<std::byte> bytes;
+            std::string value;
+        };
+
+        QueuedUpdate makeUpdate(
+            const xplane::DataRefReadResult& value,
+            int handle);
+        bool fitsBudget(
+            const LegacyUpdateSchedulerTickResult& result,
+            std::size_t pendingBytes) const;
+
+        LegacyDeviceSession& session_;
+        const LegacyDeviceController& controller_;
+        xplane::IXPlaneBridge& xplane_;
+        LegacyUpdateSchedulerOptions options_;
+        std::vector<SubscriptionState> states_;
+    };
+}

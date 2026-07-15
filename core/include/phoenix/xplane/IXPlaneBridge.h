@@ -37,6 +37,23 @@ namespace phoenix::xplane
         std::optional<int> element;
     };
 
+    struct DataRefReadRequest
+    {
+        std::string name;
+        int handle = -1;
+        int xplaneType = DataRefTypeUnknown;
+        std::optional<int> preferredType;
+        std::optional<int> element;
+    };
+
+    struct DataRefReadResult
+    {
+        bool found = false;
+        int valueType = DataRefTypeUnknown;
+        std::string value;
+        std::optional<int> element;
+    };
+
     class IXPlaneBridge
     {
     public:
@@ -50,6 +67,9 @@ namespace phoenix::xplane
 
         virtual void writeDataRef(
             const DataRefWrite& write) = 0;
+
+        virtual DataRefReadResult readDataRef(
+            const DataRefReadRequest& request) = 0;
 
         virtual void touchDataRef(
             std::string_view name,

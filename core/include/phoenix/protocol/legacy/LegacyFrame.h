@@ -23,7 +23,6 @@ namespace phoenix::protocol::legacy
     constexpr char printDebugCommand = 'g';
     constexpr char speakCommand = 's';
     constexpr char dataRefTouchRequestCommand = 'd';
-    constexpr char noMoreRequestsCommand = 'c';
     constexpr char updatesRequestCommand = 'r';
     constexpr char updatesArrayRequestCommand = 't';
     constexpr char updatesTypeRequestCommand = 'y';

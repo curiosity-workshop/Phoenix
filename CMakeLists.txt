@@ -27,6 +27,7 @@ add_executable(Phoenix
     # Runtime
     core/src/runtime/LegacyDeviceController.cpp
     core/src/runtime/LegacyDeviceSession.cpp
+    core/src/runtime/LegacyUpdateScheduler.cpp
 
     # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
@@ -110,6 +111,27 @@ target_include_directories(PhoenixDeviceControllerTests
 add_test(
     NAME PhoenixDeviceControllerTests
     COMMAND PhoenixDeviceControllerTests
+)
+
+add_executable(PhoenixUpdateSchedulerTests
+    tests/runtime/LegacyUpdateSchedulerTests.cpp
+    core/src/logging/SerialTraceLogger.cpp
+    core/src/protocol/legacy/LegacyFrame.cpp
+    core/src/protocol/legacy/LegacyFrameParser.cpp
+    core/src/protocol/legacy/LegacyMessage.cpp
+    core/src/runtime/LegacyDeviceController.cpp
+    core/src/runtime/LegacyDeviceSession.cpp
+    core/src/runtime/LegacyUpdateScheduler.cpp
+)
+
+target_include_directories(PhoenixUpdateSchedulerTests
+    PRIVATE
+        core/include
+)
+
+add_test(
+    NAME PhoenixUpdateSchedulerTests
+    COMMAND PhoenixUpdateSchedulerTests
 )
 
 add_executable(PhoenixProfileTests

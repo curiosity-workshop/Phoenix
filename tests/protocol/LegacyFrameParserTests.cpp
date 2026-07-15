@@ -44,9 +44,9 @@ int main()
     using phoenix::protocol::legacy::DataRefUpdate;
     using phoenix::protocol::legacy::DataRefValueType;
     using phoenix::protocol::legacy::DeviceName;
-    using phoenix::protocol::legacy::NoMoreRequests;
     using phoenix::protocol::legacy::RegisterCommand;
     using phoenix::protocol::legacy::StringDataRefUpdate;
+    using phoenix::protocol::legacy::UnknownMessage;
     using phoenix::protocol::legacy::UpdatesRequest;
     using phoenix::protocol::legacy::decodeFrame;
     using phoenix::protocol::legacy::makeFrame;
@@ -193,12 +193,14 @@ int main()
         LegacyFrameParser parser;
 
         const auto frames = parser.push(bytes("[c]"));
-        passed &= expect(frames.size() == 1, "no-more-requests frame should parse");
+        passed &= expect(frames.size() == 1, "unsupported legacy frame should parse");
 
         const auto message = decodeFrame(frames[0]);
+        const auto* unknown = std::get_if<UnknownMessage>(&message);
+        passed &= expect(unknown != nullptr, "unsupported legacy frame should decode as unknown");
         passed &= expect(
-            std::holds_alternative<NoMoreRequests>(message),
-            "no-more-requests should decode as inert legacy message");
+            unknown && unknown->frame.command == 'c',
+            "unsupported legacy frame command should be retained");
     }
 
     return passed ? 0 : 1;

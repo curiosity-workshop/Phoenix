@@ -94,9 +94,6 @@ namespace phoenix::protocol::legacy
         case sendRequestCommand:
             return RegistrationRequest{};
 
-        case noMoreRequestsCommand:
-            return NoMoreRequests{};
-
         case dataFlowPauseCommand:
             return DataFlowPause{};
 
