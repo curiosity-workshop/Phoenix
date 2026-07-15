@@ -12,6 +12,7 @@ namespace phoenix::protocol::legacy
     constexpr char packetTrailer = ']';
     constexpr char sendNameCommand = 'N';
     constexpr char sendRequestCommand = 'Q';
+    constexpr char profileAcceptedCommand = 'A';
     constexpr char dataFlowPauseCommand = 'p';
     constexpr char dataFlowResumeCommand = 'q';
     constexpr char setDataFlowSpeedCommand = 'f';

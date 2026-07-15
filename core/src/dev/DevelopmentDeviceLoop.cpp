@@ -1,6 +1,7 @@
 #include <phoenix/dev/DevelopmentDeviceLoop.h>
 
 #include <phoenix/logging/Log.h>
+#include <phoenix/profile/JsonDeviceProfileStore.h>
 #include <phoenix/protocol/legacy/LegacyFrame.h>
 #include <phoenix/runtime/LegacyDeviceController.h>
 #include <phoenix/runtime/LegacyDeviceSession.h>
@@ -315,6 +316,7 @@ namespace phoenix::dev
         DevelopmentLegacyDeviceObserver observer;
         std::unique_ptr<runtime::LegacyDeviceSession> session;
         std::unique_ptr<runtime::LegacyDeviceController> controller;
+        bool profileAccepted = false;
         bool emulatedDataRefState = true;
         std::chrono::steady_clock::time_point nextToggleTime =
             std::chrono::steady_clock::now();
@@ -433,11 +435,183 @@ namespace phoenix::dev
             device.nextToggleTime =
                 now + std::chrono::seconds{ 2 };
         }
+
+        profile::DeviceProfile buildProfile(
+            const DevelopmentDeviceManager::DeviceContext& device)
+        {
+            profile::DeviceProfile profile;
+            profile.deviceName = device.deviceName;
+            profile.deviceVersion = device.deviceVersion;
+
+            for (const auto& binding :
+                device.controller->dataRefs())
+            {
+                profile::DeviceProfileDataRef dataRef;
+                dataRef.handle = binding.handle;
+                dataRef.name = binding.name;
+                dataRef.xplaneType = binding.xplaneType;
+                dataRef.active = binding.active;
+                dataRef.scalingActive = binding.scalingActive;
+                dataRef.scaleFromLow = binding.scaleFromLow;
+                dataRef.scaleFromHigh = binding.scaleFromHigh;
+                dataRef.scaleToLow = binding.scaleToLow;
+                dataRef.scaleToHigh = binding.scaleToHigh;
+
+                for (const auto& subscription :
+                    device.controller->updateSubscriptions())
+                {
+                    if (subscription.handle != binding.handle)
+                    {
+                        continue;
+                    }
+
+                    dataRef.updates.push_back({
+                        subscription.handle,
+                        subscription.requestedType,
+                        subscription.rate,
+                        subscription.precision,
+                        subscription.element
+                    });
+                }
+
+                profile.dataRefs.push_back(std::move(dataRef));
+            }
+
+            for (const auto& binding :
+                device.controller->commands())
+            {
+                profile.commands.push_back({
+                    binding.handle,
+                    binding.name,
+                    binding.active
+                });
+            }
+
+            return profile;
+        }
+
+        void saveProfile(
+            const profile::JsonDeviceProfileStore& store,
+            const DevelopmentDeviceManager::DeviceContext& device)
+        {
+            const auto profile =
+                buildProfile(device);
+
+            const auto path =
+                store.profilePathFor(profile);
+
+            std::ostringstream message;
+
+            if (store.save(profile))
+            {
+                message
+                    << "  Saved device profile for "
+                    << device.portName
+                    << ": "
+                    << path.string()
+                    << '\n';
+
+                logging::info(message.str());
+            }
+            else
+            {
+                message
+                    << "  Unable to save device profile for "
+                    << device.portName
+                    << ": "
+                    << path.string()
+                    << '\n';
+
+                logging::warning(message.str());
+            }
+        }
+
+        std::string profileAcceptedPayload(
+            std::size_t dataRefCount,
+            std::size_t commandCount)
+        {
+            std::ostringstream payload;
+
+            payload
+                << ','
+                << dataRefCount
+                << ','
+                << commandCount;
+
+            return payload.str();
+        }
+
+        void tryAcceptStoredProfile(
+            const profile::JsonDeviceProfileStore& store,
+            DevelopmentDeviceManager::DeviceContext& device)
+        {
+            profile::DeviceProfile identity;
+            identity.deviceName = device.deviceName;
+            identity.deviceVersion = device.deviceVersion;
+
+            const auto path =
+                store.profilePathFor(identity);
+
+            const auto loadedProfile =
+                store.load(path);
+
+            if (!loadedProfile)
+            {
+                std::ostringstream message;
+
+                message
+                    << "  No stored profile matched "
+                    << device.portName
+                    << " ("
+                    << device.deviceName
+                    << ", "
+                    << device.deviceVersion
+                    << ").\n";
+
+                logging::info(message.str());
+                return;
+            }
+
+            if (!device.controller->tryLoadProfile(*loadedProfile))
+            {
+                std::ostringstream message;
+
+                message
+                    << "  Stored profile could not be resolved for "
+                    << device.portName
+                    << "; using legacy registration.\n";
+
+                logging::warning(message.str());
+                return;
+            }
+
+            device.profileAccepted = true;
+            device.session->queueFrame(
+                protocol::legacy::profileAcceptedCommand,
+                profileAcceptedPayload(
+                    loadedProfile->dataRefs.size(),
+                    loadedProfile->commands.size()));
+
+            std::ostringstream message;
+
+            message
+                << "  Stored profile accepted for "
+                << device.portName
+                << ": "
+                << loadedProfile->dataRefs.size()
+                << " dataref(s), "
+                << loadedProfile->commands.size()
+                << " command(s).\n";
+
+            logging::info(message.str());
+        }
     }
 
     DevelopmentDeviceManager::DevelopmentDeviceManager(
-        logging::ISerialTraceSink& serialTrace)
+        logging::ISerialTraceSink& serialTrace,
+        std::filesystem::path profileDirectory)
         : serialTrace_(serialTrace)
+        , profileDirectory_(std::move(profileDirectory))
     {
     }
 
@@ -464,6 +638,14 @@ namespace phoenix::dev
             << " for the development runtime loop.\n";
 
         logging::info(message.str());
+
+        const profile::JsonDeviceProfileStore profileStore{
+            profileDirectory_
+        };
+
+        tryAcceptStoredProfile(
+            profileStore,
+            *device);
 
         device->controller->requestRegistrations();
         device->nextToggleTime =
@@ -521,6 +703,10 @@ namespace phoenix::dev
         logging::info(
             "  Development runtime loop complete.\n");
 
+        const profile::JsonDeviceProfileStore profileStore{
+            profileDirectory_
+        };
+
         for (const auto& device : devices_)
         {
             std::ostringstream summary;
@@ -543,6 +729,7 @@ namespace phoenix::dev
                 << '\n';
 
             logging::info(summary.str());
+            saveProfile(profileStore, *device);
         }
     }
 }

@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -18,7 +19,8 @@ namespace phoenix::dev
         struct DeviceContext;
 
         explicit DevelopmentDeviceManager(
-            logging::ISerialTraceSink& serialTrace);
+            logging::ISerialTraceSink& serialTrace,
+            std::filesystem::path profileDirectory);
 
         ~DevelopmentDeviceManager();
 
@@ -41,6 +43,7 @@ namespace phoenix::dev
 
     private:
         logging::ISerialTraceSink& serialTrace_;
+        std::filesystem::path profileDirectory_;
         std::vector<std::unique_ptr<DeviceContext>> devices_;
     };
 }

@@ -125,6 +125,67 @@ namespace phoenix::runtime
         return maxBytesPerSecond_;
     }
 
+    bool LegacyDeviceController::tryLoadProfile(
+        const profile::DeviceProfile& profile)
+    {
+        std::vector<LegacyDataRefBinding> dataRefs;
+        std::vector<LegacyCommandBinding> commands;
+
+        for (const auto& profileDataRef : profile.dataRefs)
+        {
+            if (profileDataRef.handle !=
+                static_cast<int>(dataRefs.size()))
+            {
+                return false;
+            }
+
+            const auto lookup =
+                xplane_.findDataRef(profileDataRef.name);
+
+            if (!lookup.found)
+            {
+                return false;
+            }
+
+            dataRefs.push_back({
+                profileDataRef.handle,
+                profileDataRef.name,
+                lookup.type,
+                true
+            });
+        }
+
+        for (const auto& profileCommand : profile.commands)
+        {
+            if (profileCommand.handle !=
+                static_cast<int>(commands.size()))
+            {
+                return false;
+            }
+
+            const auto lookup =
+                xplane_.findCommand(profileCommand.name);
+
+            if (!lookup.found)
+            {
+                return false;
+            }
+
+            commands.push_back({
+                profileCommand.handle,
+                profileCommand.name,
+                true
+            });
+        }
+
+        dataRefs_ = std::move(dataRefs);
+        commands_ = std::move(commands);
+        updateSubscriptions_.clear();
+        profilePreloaded_ = true;
+
+        return true;
+    }
+
     void LegacyDeviceController::processMessage(
         const protocol::legacy::LegacyMessage& message)
     {
@@ -195,6 +256,8 @@ namespace phoenix::runtime
     void LegacyDeviceController::handleRegisterDataRef(
         const protocol::legacy::RegisterDataRef& message)
     {
+        clearLoadedProfile();
+
         if (observer_ != nullptr)
         {
             observer_->microcontrollerRequestedDataRef(
@@ -229,6 +292,8 @@ namespace phoenix::runtime
     void LegacyDeviceController::handleRegisterCommand(
         const protocol::legacy::RegisterCommand& message)
     {
+        clearLoadedProfile();
+
         if (observer_ != nullptr)
         {
             observer_->microcontrollerRequestedCommand(
@@ -350,6 +415,19 @@ namespace phoenix::runtime
                 message.triggerCount);
             break;
         }
+    }
+
+    void LegacyDeviceController::clearLoadedProfile()
+    {
+        if (!profilePreloaded_)
+        {
+            return;
+        }
+
+        dataRefs_.clear();
+        commands_.clear();
+        updateSubscriptions_.clear();
+        profilePreloaded_ = false;
     }
 
     LegacyDataRefBinding* LegacyDeviceController::findDataRef(

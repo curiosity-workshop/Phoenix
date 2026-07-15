@@ -409,5 +409,78 @@ int main()
         transport.writtenText().ends_with("[D,-02,\"sim/missing\"]"),
         "missing dataref response failed");
 
+    {
+        FakeTransport profileTransport;
+        FakeXPlaneBridge profileXPlane;
+
+        profileXPlane.dataRefs["sim/profile/dataref"] = DataRefTypeInt;
+        profileXPlane.commands.push_back("sim/profile/command");
+
+        LegacyDeviceSession profileSession{
+            profileTransport,
+            LegacyDeviceSessionOptions{
+                .readBufferSize = 64,
+                .maximumReadPasses = 8
+            }
+        };
+
+        LegacyDeviceController profileController{
+            profileSession,
+            profileXPlane
+        };
+
+        phoenix::profile::DeviceProfile profile;
+        profile.dataRefs.push_back({
+            0,
+            "sim/profile/dataref",
+            DataRefTypeFloat,
+            true
+        });
+        profile.commands.push_back({
+            0,
+            "sim/profile/command",
+            true
+        });
+
+        passed &= expect(
+            profileController.tryLoadProfile(profile),
+            "profile should load when entries resolve");
+        passed &= expect(
+            profileController.dataRefs().size() == 1,
+            "profile dataref should be retained");
+        passed &= expect(
+            profileController.dataRefs()[0].xplaneType == DataRefTypeInt,
+            "profile should use the current xplane dataref type");
+        passed &= expect(
+            profileController.commands().size() == 1,
+            "profile command should be retained");
+
+        profileTransport.pushIncoming("[r,0,100,0.0000]");
+        auto profileTick = profileController.tick();
+
+        passed &= expect(
+            profileTick.messagesProcessed == 1,
+            "profile update request should process");
+        passed &= expect(
+            profileController.updateSubscriptions().size() == 1,
+            "profile update request should be retained");
+
+        profileTransport.pushIncoming("[b,\"sim/profile/dataref\"]");
+        profileTick = profileController.tick();
+
+        passed &= expect(
+            profileTick.messagesProcessed == 1,
+            "legacy registration should process after profile fallback");
+        passed &= expect(
+            profileController.dataRefs().size() == 1,
+            "legacy registration should clear preloaded profile before adding");
+        passed &= expect(
+            profileController.updateSubscriptions().empty(),
+            "legacy fallback should clear profile-mode subscriptions");
+        passed &= expect(
+            profileTransport.writtenText().ends_with("[D,0]"),
+            "legacy fallback should reply with sequential handle zero");
+    }
+
     return passed ? 0 : 1;
 }

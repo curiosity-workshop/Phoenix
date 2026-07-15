@@ -149,7 +149,8 @@ int main()
 
     std::size_t devicesFound = 0;
     phoenix::dev::DevelopmentDeviceManager deviceManager{
-        serialTrace
+        serialTrace,
+        sourceRoot() / "profiles"
     };
 
     for (const auto& port : ports)

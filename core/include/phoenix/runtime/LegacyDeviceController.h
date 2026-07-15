@@ -1,5 +1,6 @@
 #pragma once
 
+#include <phoenix/profile/DeviceProfile.h>
 #include <phoenix/protocol/legacy/LegacyMessage.h>
 #include <phoenix/runtime/LegacyDeviceSession.h>
 #include <phoenix/xplane/IXPlaneBridge.h>
@@ -80,6 +81,8 @@ namespace phoenix::runtime
 
         LegacyDeviceControllerTickResult tick();
         void requestRegistrations();
+        bool tryLoadProfile(
+            const profile::DeviceProfile& profile);
 
         const std::vector<LegacyDataRefBinding>& dataRefs() const;
         const std::vector<LegacyCommandBinding>& commands() const;
@@ -111,6 +114,8 @@ namespace phoenix::runtime
         void handleCommandEvent(
             const protocol::legacy::CommandEvent& message);
 
+        void clearLoadedProfile();
+
         LegacyDataRefBinding* findDataRef(int handle);
         LegacyCommandBinding* findCommand(int handle);
 
@@ -120,6 +125,7 @@ namespace phoenix::runtime
         std::vector<LegacyDataRefBinding> dataRefs_;
         std::vector<LegacyCommandBinding> commands_;
         std::vector<LegacyUpdateSubscription> updateSubscriptions_;
+        bool profilePreloaded_ = false;
         bool registrationsRequested_ = false;
         bool dataFlowPaused_ = false;
         long maxBytesPerSecond_ = 0;

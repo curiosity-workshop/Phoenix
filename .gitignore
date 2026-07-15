@@ -29,6 +29,7 @@ x86/
 
 # Runtime logs
 PhoenixSerial.log
+profiles/*.json
 
 # OS
 Thumbs.db

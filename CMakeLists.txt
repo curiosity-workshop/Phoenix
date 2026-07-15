@@ -16,6 +16,9 @@ add_executable(Phoenix
     core/src/logging/Log.cpp
     core/src/logging/SerialTraceLogger.cpp
 
+    # Profile
+    core/src/profile/JsonDeviceProfileStore.cpp
+
     # Protocol
     core/src/protocol/legacy/LegacyFrame.cpp
     core/src/protocol/legacy/LegacyFrameParser.cpp
@@ -107,4 +110,19 @@ target_include_directories(PhoenixDeviceControllerTests
 add_test(
     NAME PhoenixDeviceControllerTests
     COMMAND PhoenixDeviceControllerTests
+)
+
+add_executable(PhoenixProfileTests
+    tests/profile/JsonDeviceProfileStoreTests.cpp
+    core/src/profile/JsonDeviceProfileStore.cpp
+)
+
+target_include_directories(PhoenixProfileTests
+    PRIVATE
+        core/include
+)
+
+add_test(
+    NAME PhoenixProfileTests
+    COMMAND PhoenixProfileTests
 )
