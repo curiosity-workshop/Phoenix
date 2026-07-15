@@ -1,6 +1,7 @@
 #pragma once
 
 #include <phoenix/logging/SerialTraceLogger.h>
+#include <phoenix/runtime/DeviceRuntimeManager.h>
 #include <phoenix/transport/IByteTransport.h>
 
 #include <chrono>
@@ -42,8 +43,8 @@ namespace phoenix::dev
             std::chrono::steady_clock::duration duration);
 
     private:
-        logging::ISerialTraceSink& serialTrace_;
-        std::filesystem::path profileDirectory_;
-        std::vector<std::unique_ptr<DeviceContext>> devices_;
+        struct Implementation;
+
+        std::unique_ptr<Implementation> implementation_;
     };
 }

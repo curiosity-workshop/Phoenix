@@ -5,7 +5,7 @@
 #include <phoenix/serial/SerialDeviceClassifier.h>
 #include <phoenix/serial/SerialDeviceKind.h>
 #include <phoenix/serial/WindowsSerialEnumerator.h>
-#include <phoenix/serial/WindowsSerialTransport.h>
+#include <phoenix/serial/WindowsSerialTransportFactory.h>
 
 #include <chrono>
 #include <filesystem>
@@ -77,6 +77,7 @@ int main()
         "Enumerating serial ports...\n\n");
 
     phoenix::serial::WindowsSerialEnumerator enumerator;
+    phoenix::serial::WindowsSerialTransportFactory transportFactory;
 
     const auto ports = enumerator.enumerate();
 
@@ -190,7 +191,7 @@ int main()
         }
 
         auto transport =
-            std::make_unique<phoenix::serial::WindowsSerialTransport>(
+            transportFactory.create(
                 port.portName,
                 115200);
 

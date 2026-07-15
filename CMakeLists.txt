@@ -25,6 +25,7 @@ add_executable(Phoenix
     core/src/protocol/legacy/LegacyMessage.cpp
 
     # Runtime
+    core/src/runtime/DeviceRuntimeManager.cpp
     core/src/runtime/LegacyDeviceController.cpp
     core/src/runtime/LegacyDeviceSession.cpp
     core/src/runtime/LegacyUpdateScheduler.cpp
@@ -32,6 +33,7 @@ add_executable(Phoenix
     # Serial
     core/src/serial/WindowsSerialEnumerator.cpp
     core/src/serial/WindowsSerialTransport.cpp
+    core/src/serial/WindowsSerialTransportFactory.cpp
     core/src/serial/SerialDeviceClassifier.cpp
 
     # Discovery
