@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <functional>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -105,6 +107,23 @@ namespace
         return "unknown";
     }
 
+    std::string controlModeName(
+        phoenix::serial::WindowsSerialControlMode mode)
+    {
+        using phoenix::serial::WindowsSerialControlMode;
+
+        switch (mode)
+        {
+        case WindowsSerialControlMode::DtrRtsDisabled:
+            return "DTR/RTS disabled";
+
+        case WindowsSerialControlMode::DtrRtsEnabled:
+            return "DTR/RTS enabled";
+        }
+
+        return "unknown control mode";
+    }
+
     std::string extractQuotedString(
         std::string_view payload)
     {
@@ -136,8 +155,13 @@ namespace
     {
     public:
         explicit PluginLegacyDeviceObserver(
-            std::string portName)
+            std::string portName,
+            std::function<void(
+                std::string_view,
+                std::string_view,
+                std::optional<int>)> dataRefSentCallback)
             : portName_(std::move(portName))
+            , dataRefSentCallback_(std::move(dataRefSentCallback))
         {
         }
 
@@ -167,6 +191,20 @@ namespace
         {
         }
 
+        void dataRefSentToDevice(
+            std::string_view name,
+            std::string_view value,
+            std::optional<int> element) override
+        {
+            if (dataRefSentCallback_)
+            {
+                dataRefSentCallback_(
+                    name,
+                    value,
+                    element);
+            }
+        }
+
     private:
         void logRequest(
             std::string_view type,
@@ -186,12 +224,25 @@ namespace
         }
 
         std::string portName_;
+        std::function<void(
+            std::string_view,
+            std::string_view,
+            std::optional<int>)> dataRefSentCallback_;
     };
 
     class PluginLegacyDeviceObserverFactory final
         : public phoenix::runtime::ILegacyDeviceObserverFactory
     {
     public:
+        explicit PluginLegacyDeviceObserverFactory(
+            std::function<void(
+                std::string_view,
+                std::string_view,
+                std::optional<int>)> dataRefSentCallback)
+            : dataRefSentCallback_(std::move(dataRefSentCallback))
+        {
+        }
+
         std::unique_ptr<phoenix::runtime::ILegacyDeviceObserver>
             createObserver(
                 std::string_view portName,
@@ -199,8 +250,15 @@ namespace
                 std::string_view) override
         {
             return std::make_unique<PluginLegacyDeviceObserver>(
-                std::string{ portName });
+                std::string{ portName },
+                dataRefSentCallback_);
         }
+
+    private:
+        std::function<void(
+            std::string_view,
+            std::string_view,
+            std::optional<int>)> dataRefSentCallback_;
     };
 
     class ToggleableSerialTraceSink final
@@ -279,17 +337,24 @@ namespace
             const phoenix::xplane::DataRefReadRequest& request,
             const phoenix::xplane::DataRefReadResult& result) override
         {
+        }
+
+        void dataRefSentToDevice(
+            std::string_view name,
+            std::string_view value,
+            std::optional<int> element)
+        {
             std::ostringstream message;
             message
-                << request.name
+                << name
                 << " = "
-                << result.value;
+                << value;
 
-            if (result.element)
+            if (element)
             {
                 message
                     << " element "
-                    << *result.element;
+                    << *element;
             }
 
             lastDataRefSent_ =
@@ -359,8 +424,11 @@ namespace
         std::unique_ptr<phoenix::transport::IByteTransport> transport;
         phoenix::protocol::legacy::LegacyFrameParser parser;
         phoenix::discovery::DiscoveredDevice device;
+        phoenix::serial::WindowsSerialControlMode controlMode =
+            phoenix::serial::WindowsSerialControlMode::DtrRtsDisabled;
         std::chrono::steady_clock::time_point deadline{};
         std::chrono::steady_clock::time_point nextRequestAt{};
+        bool requestsStarted = false;
     };
 
     class PhoenixPluginRuntime
@@ -370,6 +438,7 @@ namespace
             : outputDirectory_(preparedPhoenixOutputDirectory())
             , profileDirectory_(outputDirectory_ / "profiles")
             , serialTracePath_(outputDirectory_ / "PhoenixSerial.log")
+            , settingsPath_(outputDirectory_ / "PhoenixSettings.txt")
             , serialTrace_(serialTracePath_)
             , deviceRuntime_(
                 serialTrace_,
@@ -390,6 +459,7 @@ namespace
                     return statusWindowLines();
                 })
         {
+            loadSettings();
             createMenu();
         }
 
@@ -485,6 +555,8 @@ namespace
             std::chrono::milliseconds{ 50 };
         static constexpr auto ProbeTimeout =
             std::chrono::seconds{ 2 };
+        static constexpr auto ProbeOpenSettleDelay =
+            std::chrono::seconds{ 3 };
         static constexpr auto AutoCloseStatusWindowDelay =
             std::chrono::seconds{ 3 };
 
@@ -578,7 +650,9 @@ namespace
             XPLMCheckMenuItem(
                 menu_,
                 serialTraceItemIndex_,
-                xplm_Menu_Unchecked);
+                serialTraceEnabled_ ?
+                    xplm_Menu_Checked :
+                    xplm_Menu_Unchecked);
             XPLMAppendMenuSeparator(menu_);
             XPLMAppendMenuItem(
                 menu_,
@@ -919,14 +993,23 @@ namespace
             probe.transport =
                 transportFactory_.create(
                     probe.port.portName,
-                    115200);
+                    115200,
+                    probe.controlMode);
             probe.deadline =
-                now + ProbeTimeout;
+                now + ProbeOpenSettleDelay + ProbeTimeout;
             probe.nextRequestAt =
-                now;
+                now + ProbeOpenSettleDelay;
 
             if (!probe.transport->open())
             {
+                if (retryProbeWithAlternateControlMode(
+                    probe,
+                    now,
+                    "initial open failed"))
+                {
+                    return;
+                }
+
                 ++portsScanned_;
                 engagementStatus_ =
                     "Unable to open " + probe.port.portName + ".";
@@ -934,10 +1017,29 @@ namespace
             }
 
             engagementStatus_ =
-                "Probing " + probe.port.portName +
-                " (" + deviceKindName(probe.port.kind) + ").";
+                "Waiting for " + probe.port.portName +
+                " to settle (" +
+                deviceKindName(probe.port.kind) +
+                ", " + controlModeName(probe.controlMode) + ").";
             activeProbe_ =
                 std::move(probe);
+        }
+
+        void markActiveProbeSendingRequests()
+        {
+            if (!activeProbe_)
+            {
+                return;
+            }
+
+            if (!activeProbe_->requestsStarted)
+            {
+                activeProbe_->requestsStarted = true;
+                engagementStatus_ =
+                    "Probing " + activeProbe_->port.portName +
+                    " (" + deviceKindName(activeProbe_->port.kind) +
+                    ", " + controlModeName(activeProbe_->controlMode) + ").";
+            }
         }
 
         void tickActiveProbe(
@@ -950,6 +1052,7 @@ namespace
 
             if (now >= activeProbe_->nextRequestAt)
             {
+                markActiveProbeSendingRequests();
                 sendProbeRequest(*activeProbe_);
                 activeProbe_->nextRequestAt =
                     now + ProbeRetryInterval;
@@ -963,11 +1066,96 @@ namespace
 
             if (now >= activeProbe_->deadline)
             {
+                const auto portName =
+                    activeProbe_->port.portName;
+
+                if (retryActiveProbeWithAlternateControlMode(
+                    now,
+                    "no response"))
+                {
+                    return;
+                }
+
                 engagementStatus_ =
                     "No XPLLink response from " +
-                    activeProbe_->port.portName + ".";
+                    portName + ".";
                 closeActiveProbe();
             }
+        }
+
+        bool retryActiveProbeWithAlternateControlMode(
+            std::chrono::steady_clock::time_point now,
+            std::string_view reason)
+        {
+            if (!activeProbe_)
+            {
+                return false;
+            }
+
+            if (activeProbe_->controlMode ==
+                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled)
+            {
+                return false;
+            }
+
+            auto probe =
+                std::move(*activeProbe_);
+            activeProbe_.reset();
+
+            return retryProbeWithAlternateControlMode(
+                probe,
+                now,
+                reason);
+        }
+
+        bool retryProbeWithAlternateControlMode(
+            IncrementalProbe& probe,
+            std::chrono::steady_clock::time_point now,
+            std::string_view reason)
+        {
+            if (probe.controlMode ==
+                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled)
+            {
+                return false;
+            }
+
+            if (probe.transport &&
+                probe.transport->isOpen())
+            {
+                probe.transport->close();
+            }
+
+            probe.controlMode =
+                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled;
+            probe.transport =
+                transportFactory_.create(
+                    probe.port.portName,
+                    115200,
+                    probe.controlMode);
+            probe.parser =
+                phoenix::protocol::legacy::LegacyFrameParser{};
+            probe.device =
+                {};
+            probe.deadline =
+                now + ProbeOpenSettleDelay + ProbeTimeout;
+            probe.nextRequestAt =
+                now + ProbeOpenSettleDelay;
+            probe.requestsStarted =
+                false;
+
+            if (!probe.transport->open())
+            {
+                return false;
+            }
+
+            engagementStatus_ =
+                "Retrying " + probe.port.portName +
+                " (" + controlModeName(probe.controlMode) +
+                ", " + std::string{ reason } + ").";
+            activeProbe_ =
+                std::move(probe);
+
+            return true;
         }
 
         void sendProbeRequest(
@@ -1146,12 +1334,59 @@ namespace
             }
         }
 
+        void loadSettings()
+        {
+            std::ifstream stream{
+                settingsPath_
+            };
+
+            if (!stream)
+            {
+                return;
+            }
+
+            std::string line;
+
+            while (std::getline(stream, line))
+            {
+                if (line == "serialTraceEnabled=1")
+                {
+                    serialTraceEnabled_ = true;
+                    serialTrace_.setEnabled(true);
+                }
+                else if (line == "serialTraceEnabled=0")
+                {
+                    serialTraceEnabled_ = false;
+                    serialTrace_.setEnabled(false);
+                }
+            }
+        }
+
+        void saveSettings() const
+        {
+            std::ofstream stream{
+                settingsPath_,
+                std::ios::trunc
+            };
+
+            if (!stream)
+            {
+                return;
+            }
+
+            stream
+                << "serialTraceEnabled="
+                << (serialTraceEnabled_ ? "1" : "0")
+                << '\n';
+        }
+
         void toggleSerialTrace()
         {
             serialTraceEnabled_ =
                 !serialTraceEnabled_;
             serialTrace_.setEnabled(
                 serialTraceEnabled_);
+            saveSettings();
 
             if (menu_ != nullptr && serialTraceItemIndex_ >= 0)
             {
@@ -1238,10 +1473,22 @@ namespace
             api_,
             &interactionTelemetry_
         };
-        PluginLegacyDeviceObserverFactory observerFactory_;
+        PluginLegacyDeviceObserverFactory observerFactory_{
+            [this](
+                std::string_view name,
+                std::string_view value,
+                std::optional<int> element)
+            {
+                interactionTelemetry_.dataRefSentToDevice(
+                    name,
+                    value,
+                    element);
+            }
+        };
         std::filesystem::path outputDirectory_;
         std::filesystem::path profileDirectory_;
         std::filesystem::path serialTracePath_;
+        std::filesystem::path settingsPath_;
         ToggleableSerialTraceSink serialTrace_;
         phoenix::runtime::DeviceRuntimeManager deviceRuntime_;
         phoenix::serial::WindowsSerialEnumerator serialEnumerator_;

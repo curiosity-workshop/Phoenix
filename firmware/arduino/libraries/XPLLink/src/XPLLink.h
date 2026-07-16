@@ -152,6 +152,7 @@ namespace phoenix
         void transmitPacket();
         void sendName();
         void sendVersion();
+        bool linkedForOutboundTraffic() const;
         void sendPacketVoid(int command, int handle);
         void sendPacketVoid(int command);
         void sendPacketString(int command, const char* value);
@@ -169,6 +170,7 @@ namespace phoenix
         const char* deviceName_ = nullptr;
         bool registerFlag_ = false;
         bool connectionStatus_ = false;
+        bool outboundTrafficEnabled_ = false;
         bool cachedRegistrationAccepted_ = false;
         int cachedDataRefCount_ = 0;
         int cachedCommandCount_ = 0;

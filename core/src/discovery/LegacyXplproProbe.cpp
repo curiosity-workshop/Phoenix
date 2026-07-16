@@ -39,9 +39,11 @@ namespace phoenix::discovery
 
     LegacyXplproProbe::LegacyXplproProbe(
         std::chrono::milliseconds retryInterval,
-        std::chrono::milliseconds timeout)
+        std::chrono::milliseconds timeout,
+        std::chrono::milliseconds openSettleDelay)
         : retryInterval_(retryInterval),
-        timeout_(timeout)
+        timeout_(timeout),
+        openSettleDelay_(openSettleDelay)
     {
     }
 
@@ -68,9 +70,9 @@ namespace phoenix::discovery
             std::chrono::steady_clock::now();
 
         const auto deadline =
-            startTime + timeout_;
+            startTime + openSettleDelay_ + timeout_;
 
-        auto nextRequestTime = startTime;
+        auto nextRequestTime = startTime + openSettleDelay_;
 
         while (std::chrono::steady_clock::now() < deadline)
         {

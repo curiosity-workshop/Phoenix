@@ -15,13 +15,21 @@
 
 namespace phoenix::serial
 {
+    enum class WindowsSerialControlMode
+    {
+        DtrRtsDisabled,
+        DtrRtsEnabled
+    };
+
     class WindowsSerialTransport final
         : public transport::IByteTransport
     {
     public:
         explicit WindowsSerialTransport(
             std::string portName,
-            std::uint32_t baudRate = 115200);
+            std::uint32_t baudRate = 115200,
+            WindowsSerialControlMode controlMode =
+                WindowsSerialControlMode::DtrRtsDisabled);
 
         ~WindowsSerialTransport() override;
 
@@ -48,6 +56,7 @@ namespace phoenix::serial
 
         std::string portName_;
         std::uint32_t baudRate_;
+        WindowsSerialControlMode controlMode_;
         HANDLE handle_ = INVALID_HANDLE_VALUE;
     };
 }

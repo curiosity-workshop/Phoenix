@@ -21,9 +21,11 @@ namespace phoenix::serial
 
     WindowsSerialTransport::WindowsSerialTransport(
         std::string portName,
-        std::uint32_t baudRate)
+        std::uint32_t baudRate,
+        WindowsSerialControlMode controlMode)
         : portName_(std::move(portName)),
-        baudRate_(baudRate)
+        baudRate_(baudRate),
+        controlMode_(controlMode)
     {
     }
 
@@ -97,8 +99,16 @@ namespace phoenix::serial
         configuration.fOutX = FALSE;
         configuration.fInX = FALSE;
 
-        configuration.fDtrControl = DTR_CONTROL_DISABLE;
-        configuration.fRtsControl = RTS_CONTROL_DISABLE;
+        if (controlMode_ == WindowsSerialControlMode::DtrRtsEnabled)
+        {
+            configuration.fDtrControl = DTR_CONTROL_ENABLE;
+            configuration.fRtsControl = RTS_CONTROL_ENABLE;
+        }
+        else
+        {
+            configuration.fDtrControl = DTR_CONTROL_DISABLE;
+            configuration.fRtsControl = RTS_CONTROL_DISABLE;
+        }
 
         configuration.fAbortOnError = FALSE;
 

@@ -390,6 +390,15 @@ namespace phoenix::runtime
                 device->updateScheduler->tick(now);
 
             logUpdateSchedulerActivity(*device, updateTick);
+
+            if (device->observer &&
+                !updateTick.lastDataRefName.empty())
+            {
+                device->observer->dataRefSentToDevice(
+                    updateTick.lastDataRefName,
+                    updateTick.lastDataRefValue,
+                    updateTick.lastDataRefElement);
+            }
         }
     }
 

@@ -249,6 +249,16 @@ namespace
                 std::to_string(request.toHigh));
         }
 
+        void dataRefSentToDevice(
+            std::string_view name,
+            std::string_view value,
+            std::optional<int>) override
+        {
+            requests.push_back(
+                "sent:" + std::string{ name } + ":" +
+                std::string{ value });
+        }
+
         std::vector<std::string> requests;
     };
 
@@ -354,6 +364,20 @@ int main()
         observer.requests.size() == 3 &&
         observer.requests[2] == "updates:0:100:0.0000",
         "updates request should be observable");
+
+    transport.pushIncoming("[r,0,1000,10.0000]");
+    tick = controller.tick();
+
+    passed &= expect(
+        tick.messagesProcessed == 1,
+        "replacement updates request should process");
+    passed &= expect(
+        controller.updateSubscriptions().size() == 1,
+        "replacement updates request should not duplicate");
+    passed &= expect(
+        controller.updateSubscriptions()[0].rate == 1000 &&
+        controller.updateSubscriptions()[0].precision == "10.0000",
+        "replacement updates request should update rate and precision");
 
     transport.pushIncoming("[u,0,0,1024,0,1]");
     tick = controller.tick();
@@ -468,8 +492,11 @@ int main()
             profileTick.messagesProcessed == 1,
             "profile update request should process");
         passed &= expect(
-            profileController.updateSubscriptions().size() == 2,
-            "profile update request should be retained");
+            profileController.updateSubscriptions().size() == 1,
+            "profile update request should replace matching subscription");
+        passed &= expect(
+            profileController.updateSubscriptions()[0].rate == 100,
+            "profile update request should update matching subscription rate");
 
         profileTransport.pushIncoming("[b,\"sim/profile/dataref\"]");
         profileTick = profileController.tick();

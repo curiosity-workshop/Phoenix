@@ -362,5 +362,70 @@ int main()
             "frame budget deferred update failed");
     }
 
+    {
+        FakeTransport bucketTransport;
+        FakeXPlaneBridge bucketXPlane;
+        bucketXPlane.currentValue = "1002.4";
+        bucketXPlane.dataRefType = phoenix::xplane::DataRefTypeFloat;
+
+        LegacyDeviceSession bucketSession{
+            bucketTransport,
+            LegacyDeviceSessionOptions{
+                .readBufferSize = 128,
+                .maximumReadPasses = 8
+            }
+        };
+
+        LegacyDeviceController bucketController{
+            bucketSession,
+            bucketXPlane
+        };
+
+        LegacyUpdateScheduler bucketScheduler{
+            bucketSession,
+            bucketController,
+            bucketXPlane
+        };
+
+        bucketTransport.pushIncoming(
+            "[b,\"sim/test/altitude\"][r,0,100,10.0000]");
+
+        controllerTick =
+            bucketController.tick();
+
+        passed &= expect(
+            controllerTick.messagesProcessed == 2,
+            "bucket setup messages should process");
+
+        auto bucketTick =
+            bucketScheduler.tick(start);
+
+        passed &= expect(
+            bucketTick.updatesQueued == 1,
+            "bucket scheduler should send first rounded value");
+        passed &= expect(
+            bucketTransport.writtenText().ends_with("[2,0,1000]"),
+            "bucket scheduler first rounded frame failed");
+
+        bucketXPlane.currentValue = "1004.9";
+        bucketTick =
+            bucketScheduler.tick(start + std::chrono::milliseconds{ 100 });
+
+        passed &= expect(
+            bucketTick.updatesQueued == 0,
+            "bucket scheduler should suppress same bucket");
+
+        bucketXPlane.currentValue = "1005.1";
+        bucketTick =
+            bucketScheduler.tick(start + std::chrono::milliseconds{ 200 });
+
+        passed &= expect(
+            bucketTick.updatesQueued == 1,
+            "bucket scheduler should send next bucket");
+        passed &= expect(
+            bucketTransport.writtenText().ends_with("[2,0,1010]"),
+            "bucket scheduler next rounded frame failed");
+    }
+
     return passed ? 0 : 1;
 }

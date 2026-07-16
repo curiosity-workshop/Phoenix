@@ -27,6 +27,11 @@ namespace phoenix::runtime
 
         virtual void microcontrollerRequestedScaling(
             const protocol::legacy::ScalingRequest& request) = 0;
+
+        virtual void dataRefSentToDevice(
+            std::string_view name,
+            std::string_view value,
+            std::optional<int> element) = 0;
     };
 
     struct LegacyDataRefBinding

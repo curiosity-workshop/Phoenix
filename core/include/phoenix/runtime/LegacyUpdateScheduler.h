@@ -16,6 +16,9 @@ namespace phoenix::runtime
         std::size_t updatesQueued = 0;
         std::size_t bytesWritten = 0;
         bool budgetExhausted = false;
+        std::string lastDataRefName;
+        std::string lastDataRefValue;
+        std::optional<int> lastDataRefElement;
     };
 
     struct LegacyUpdateSchedulerOptions
@@ -52,9 +55,8 @@ namespace phoenix::runtime
             const LegacyUpdateSubscription& subscription,
             std::chrono::steady_clock::time_point now);
         bool shouldSend(
-            const LegacyUpdateSubscription& subscription,
             const SubscriptionState& state,
-            const xplane::DataRefReadResult& value) const;
+            const std::string& valueToSend) const;
         struct QueuedUpdate
         {
             std::vector<std::byte> bytes;
@@ -63,7 +65,8 @@ namespace phoenix::runtime
 
         QueuedUpdate makeUpdate(
             const xplane::DataRefReadResult& value,
-            int handle);
+            int handle,
+            const std::string& valueToSend);
         bool fitsBudget(
             const LegacyUpdateSchedulerTickResult& result,
             std::size_t pendingBytes) const;

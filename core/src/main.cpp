@@ -6,10 +6,12 @@
 #include <phoenix/serial/SerialDeviceKind.h>
 #include <phoenix/serial/WindowsSerialEnumerator.h>
 #include <phoenix/serial/WindowsSerialTransportFactory.h>
+#include <phoenix/transport/IByteTransport.h>
 
 #include <chrono>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string_view>
 
@@ -38,6 +40,23 @@ namespace
         default:
             return "Unknown";
         }
+    }
+
+    std::string_view controlModeName(
+        phoenix::serial::WindowsSerialControlMode mode)
+    {
+        using phoenix::serial::WindowsSerialControlMode;
+
+        switch (mode)
+        {
+        case WindowsSerialControlMode::DtrRtsDisabled:
+            return "DTR/RTS disabled";
+
+        case WindowsSerialControlMode::DtrRtsEnabled:
+            return "DTR/RTS enabled";
+        }
+
+        return "Unknown";
     }
 
     void printPortInformation(
@@ -114,7 +133,8 @@ int main()
 
     phoenix::discovery::LegacyXplproProbe probe{
         std::chrono::milliseconds{ 50 },
-        std::chrono::seconds{ 2 }
+        std::chrono::seconds{ 2 },
+        std::chrono::seconds{ 3 }
     };
     const auto serialTracePath =
         sourceRoot() / "PhoenixSerial.log";
@@ -190,36 +210,59 @@ int main()
             phoenix::logging::info(message.str());
         }
 
-        auto transport =
-            transportFactory.create(
-                port.portName,
-                115200);
+        std::unique_ptr<phoenix::transport::IByteTransport> transport;
+        std::optional<phoenix::discovery::DiscoveredDevice> device;
 
-        if (!transport->open())
+        const phoenix::serial::WindowsSerialControlMode controlModes[] = {
+            phoenix::serial::WindowsSerialControlMode::DtrRtsDisabled,
+            phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled
+        };
+
+        for (const auto controlMode : controlModes)
         {
             std::ostringstream message;
 
             message
-                << "  Unable to open "
-                << port.portName
-                << ".\n\n";
+                << "  Trying "
+                << controlModeName(controlMode)
+                << "...\n";
+            phoenix::logging::info(message.str());
 
-            phoenix::logging::warning(message.str());
+            transport =
+                transportFactory.create(
+                    port.portName,
+                    115200,
+                    controlMode);
 
-            continue;
-        }
+            if (!transport->open())
+            {
+                phoenix::logging::warning(
+                    "  Unable to open port with this control mode.\n");
+                continue;
+            }
 
-        phoenix::logging::info(
-            "  Port opened successfully.\n"
-            "  Sending XPLPro identity requests...\n");
+            phoenix::logging::info(
+                "  Port opened successfully.\n"
+                "  Sending XPLPro identity requests...\n");
 
-        const auto device =
-            probe.probe(
+            device =
+                probe.probe(
                 *transport,
                 phoenix::discovery::LegacyXplproProbeTrace{
                     .serialTrace = &serialTrace,
                     .portName = port.portName
                 });
+
+            if (device)
+            {
+                break;
+            }
+
+            phoenix::logging::info(
+                "  No valid XPLPro response received with this control mode.\n");
+
+            transport->close();
+        }
 
         if (device)
         {

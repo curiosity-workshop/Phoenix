@@ -381,6 +381,19 @@ namespace phoenix::runtime
             return;
         }
 
+        for (auto& subscription : updateSubscriptions_)
+        {
+            if (subscription.handle == message.handle &&
+                subscription.requestedType == message.requestedType &&
+                subscription.element == message.element)
+            {
+                subscription.rate = message.rate;
+                subscription.precision = message.precision;
+                subscription.forceUpdate = true;
+                return;
+            }
+        }
+
         updateSubscriptions_.push_back({
             message.handle,
             message.requestedType,

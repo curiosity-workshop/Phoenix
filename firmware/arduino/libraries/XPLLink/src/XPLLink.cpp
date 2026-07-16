@@ -32,6 +32,7 @@ namespace phoenix
     {
         deviceName_ = deviceName;
         connectionStatus_ = false;
+        outboundTrafficEnabled_ = false;
         receiveBuffer_[0] = 0;
         registerFlag_ = false;
         initFunction_ = initFunction;
@@ -51,10 +52,11 @@ namespace phoenix
                 initFunction_();
             }
 
+            outboundTrafficEnabled_ = true;
             registerFlag_ = false;
         }
 
-        return connectionStatus_;
+        return linkedForOutboundTraffic();
     }
 
     int XPLLink::connectionStatus()
@@ -74,7 +76,7 @@ namespace phoenix
 
     int XPLLink::commandTrigger(cmd_handle commandHandle, int triggerCount)
     {
-        if (commandHandle < 0)
+        if (!linkedForOutboundTraffic() || commandHandle < 0)
         {
             return XPL_HANDLE_INVALID;
         }
@@ -93,7 +95,7 @@ namespace phoenix
 
     int XPLLink::commandStart(cmd_handle commandHandle)
     {
-        if (commandHandle < 0)
+        if (!linkedForOutboundTraffic() || commandHandle < 0)
         {
             return XPL_HANDLE_INVALID;
         }
@@ -104,7 +106,7 @@ namespace phoenix
 
     int XPLLink::commandEnd(cmd_handle commandHandle)
     {
-        if (commandHandle < 0)
+        if (!linkedForOutboundTraffic() || commandHandle < 0)
         {
             return XPL_HANDLE_INVALID;
         }
@@ -115,23 +117,43 @@ namespace phoenix
 
     int XPLLink::sendDebugMessage(const char* message)
     {
+        if (!linkedForOutboundTraffic())
+        {
+            return XPL_HANDLE_INVALID;
+        }
+
         sendPacketString(XPLCMD_PRINTDEBUG, message);
         return 1;
     }
 
     int XPLLink::sendSpeakMessage(const char* message)
     {
+        if (!linkedForOutboundTraffic())
+        {
+            return XPL_HANDLE_INVALID;
+        }
+
         sendPacketString(XPLCMD_SPEAK, message);
         return 1;
     }
 
     void XPLLink::dataFlowPause()
     {
+        if (!linkedForOutboundTraffic())
+        {
+            return;
+        }
+
         sendPacketVoid(XPLCMD_DATAFLOWPAUSE, getBufferStatus());
     }
 
     void XPLLink::dataFlowResume()
     {
+        if (!linkedForOutboundTraffic())
+        {
+            return;
+        }
+
         sendPacketVoid(XPLCMD_DATAFLOWRESUME, getBufferStatus());
     }
 
@@ -147,6 +169,11 @@ namespace phoenix
 
     void XPLLink::setDataFlowSpeed(unsigned long bytesPerSecond)
     {
+        if (!linkedForOutboundTraffic())
+        {
+            return;
+        }
+
         sprintf(
             sendBuffer_,
             "%c%c,%lu%c",
@@ -159,7 +186,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, int value)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -177,7 +204,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, int value, int arrayElement)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -196,7 +223,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, long value)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -214,7 +241,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, long value, int arrayElement)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -233,7 +260,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, float value)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -252,7 +279,7 @@ namespace phoenix
 
     void XPLLink::datarefWrite(dref_handle handle, float value, int arrayElement)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -271,7 +298,7 @@ namespace phoenix
 
     void XPLLink::datarefTouch(dref_handle handle)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -306,7 +333,7 @@ namespace phoenix
 
     void XPLLink::sendResetRequest()
     {
-        if (deviceName_ != nullptr)
+        if (linkedForOutboundTraffic())
         {
             sendPacketVoid(XPLCMD_RESET, 0);
         }
@@ -373,6 +400,7 @@ namespace phoenix
         {
         case XPL_EXITING:
             connectionStatus_ = false;
+            outboundTrafficEnabled_ = false;
             if (stopFunction_ != nullptr)
             {
                 stopFunction_();
@@ -384,6 +412,7 @@ namespace phoenix
             sendVersion();
             sendName();
             connectionStatus_ = true;
+            outboundTrafficEnabled_ = false;
             registerFlag_ = false;
             break;
 
@@ -486,6 +515,12 @@ namespace phoenix
             handle,
             XPL_PACKETTRAILER);
         transmitPacket();
+    }
+
+    bool XPLLink::linkedForOutboundTraffic() const
+    {
+        return connectionStatus_ &&
+            (registerFlag_ || outboundTrafficEnabled_);
     }
 
     void XPLLink::sendPacketVoid(int command)
@@ -670,7 +705,13 @@ namespace phoenix
 
         if (cachedRegistrationAccepted_)
         {
-            return nextCachedDataRefHandle();
+            const int cachedHandle =
+                nextCachedDataRefHandle();
+
+            if (cachedHandle != XPL_HANDLE_INVALID)
+            {
+                return cachedHandle;
+            }
         }
 
 #if XPL_USE_PROGMEM
@@ -713,7 +754,13 @@ namespace phoenix
 
         if (cachedRegistrationAccepted_)
         {
-            return nextCachedCommandHandle();
+            const int cachedHandle =
+                nextCachedCommandHandle();
+
+            if (cachedHandle != XPL_HANDLE_INVALID)
+            {
+                return cachedHandle;
+            }
         }
 
 #if XPL_USE_PROGMEM
@@ -749,7 +796,7 @@ namespace phoenix
 
     void XPLLink::requestUpdates(int handle, int rate, float precision)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -769,7 +816,7 @@ namespace phoenix
 
     void XPLLink::requestUpdates(int handle, int rate, float precision, int arrayElement)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -789,7 +836,7 @@ namespace phoenix
 
     void XPLLink::requestUpdatesType(int handle, int type, int rate, float precision)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -815,7 +862,7 @@ namespace phoenix
         float precision,
         int arrayElement)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }
@@ -841,7 +888,7 @@ namespace phoenix
         long outLow,
         long outHigh)
     {
-        if (handle < 0)
+        if (!linkedForOutboundTraffic() || handle < 0)
         {
             return;
         }

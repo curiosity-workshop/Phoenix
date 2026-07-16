@@ -322,6 +322,31 @@ namespace phoenix::dev
 
                 logging::info(message.str());
             }
+
+            void dataRefSentToDevice(
+                std::string_view name,
+                std::string_view value,
+                std::optional<int> element) override
+            {
+                std::ostringstream message;
+
+                message
+                    << "    Device received dataref update: "
+                    << name
+                    << " = "
+                    << value;
+
+                if (element)
+                {
+                    message
+                        << ", element "
+                        << *element;
+                }
+
+                message << '\n';
+
+                logging::info(message.str());
+            }
         };
 
         class DevelopmentLegacyDeviceObserverFactory final

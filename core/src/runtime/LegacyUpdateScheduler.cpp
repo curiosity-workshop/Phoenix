@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -82,6 +83,62 @@ namespace phoenix::runtime
             {
                 return std::nullopt;
             }
+        }
+
+        std::string formatDouble(double value)
+        {
+            std::ostringstream stream;
+            stream
+                << std::fixed
+                << std::setprecision(6)
+                << value;
+
+            auto result =
+                stream.str();
+
+            while (result.find('.') != std::string::npos &&
+                !result.empty() &&
+                result.back() == '0')
+            {
+                result.pop_back();
+            }
+
+            if (!result.empty() &&
+                result.back() == '.')
+            {
+                result.pop_back();
+            }
+
+            if (result == "-0")
+            {
+                return "0";
+            }
+
+            return result;
+        }
+
+        std::string bucketedValue(
+            const LegacyUpdateSubscription& subscription,
+            const std::string& value)
+        {
+            const auto precision =
+                parseDouble(subscription.precision);
+
+            if (!precision || *precision <= 0.0)
+            {
+                return value;
+            }
+
+            const auto numeric =
+                parseDouble(value);
+
+            if (!numeric)
+            {
+                return value;
+            }
+
+            return formatDouble(
+                std::round(*numeric / *precision) * *precision);
         }
 
         char commandForValueType(int valueType)
@@ -174,7 +231,11 @@ namespace phoenix::runtime
                     subscription.element
                 });
 
-            if (!value.found || !shouldSend(subscription, state, value))
+            const auto valueToSend =
+                bucketedValue(subscription, value.value);
+
+            if (!value.found ||
+                !shouldSend(state, valueToSend))
             {
                 state.nextDue =
                     now + subscriptionRate(subscription);
@@ -182,7 +243,7 @@ namespace phoenix::runtime
             }
 
             const auto update =
-                makeUpdate(value, subscription.handle);
+                makeUpdate(value, subscription.handle, valueToSend);
 
             if (update.bytes.empty())
             {
@@ -200,6 +261,12 @@ namespace phoenix::runtime
             state.hasSentValue = true;
             state.nextDue =
                 now + subscriptionRate(subscription);
+            result.lastDataRefName =
+                binding->name;
+            result.lastDataRefValue =
+                update.value;
+            result.lastDataRefElement =
+                value.element;
             result.bytesWritten += update.bytes.size();
             ++result.updatesQueued;
         }
@@ -254,37 +321,21 @@ namespace phoenix::runtime
     }
 
     bool LegacyUpdateScheduler::shouldSend(
-        const LegacyUpdateSubscription& subscription,
         const SubscriptionState& state,
-        const xplane::DataRefReadResult& value) const
+        const std::string& valueToSend) const
     {
         if (!state.hasSentValue)
         {
             return true;
         }
 
-        const auto precision =
-            parseDouble(subscription.precision);
-
-        if (precision && *precision > 0.0)
-        {
-            const auto previous =
-                parseDouble(state.lastValue);
-            const auto current =
-                parseDouble(value.value);
-
-            if (previous && current)
-            {
-                return std::abs(*current - *previous) >= *precision;
-            }
-        }
-
-        return value.value != state.lastValue;
+        return valueToSend != state.lastValue;
     }
 
     LegacyUpdateScheduler::QueuedUpdate LegacyUpdateScheduler::makeUpdate(
         const xplane::DataRefReadResult& value,
-        int handle)
+        int handle,
+        const std::string& valueToSend)
     {
         const char command =
             commandForValueType(value.valueType);
@@ -315,7 +366,7 @@ namespace phoenix::runtime
             };
         }
 
-        payload << ',' << value.value;
+        payload << ',' << valueToSend;
 
         if (value.element)
         {
@@ -324,7 +375,7 @@ namespace phoenix::runtime
 
         return {
             protocol::legacy::makeFrame(command, payload.str()),
-            value.value
+            valueToSend
         };
     }
 

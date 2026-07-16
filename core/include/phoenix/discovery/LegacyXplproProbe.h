@@ -23,7 +23,9 @@ namespace phoenix::discovery
             std::chrono::milliseconds retryInterval =
             std::chrono::milliseconds{ 250 },
             std::chrono::milliseconds timeout =
-            std::chrono::seconds{ 4 });
+            std::chrono::seconds{ 4 },
+            std::chrono::milliseconds openSettleDelay =
+            std::chrono::seconds{ 0 });
 
         std::optional<DiscoveredDevice> probe(
             transport::IByteTransport& transport,
@@ -32,5 +34,6 @@ namespace phoenix::discovery
     private:
         std::chrono::milliseconds retryInterval_;
         std::chrono::milliseconds timeout_;
+        std::chrono::milliseconds openSettleDelay_;
     };
 }
