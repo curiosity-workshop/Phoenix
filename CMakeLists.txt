@@ -26,6 +26,11 @@ set(PHOENIX_XPLANE_PLUGIN_DEPLOY_DIR
     CACHE PATH
     "Optional exact directory where Phoenix.xpl should be copied after build")
 
+set(PHOENIX_DISTRIBUTION_DIR
+    "${CMAKE_SOURCE_DIR}/dist/Phoenix"
+    CACHE PATH
+    "Directory where distributable Phoenix plugin files are copied after build")
+
 if(NOT PHOENIX_XPLANE_SDK_PATH AND DEFINED ENV{XPLANE_SDK_ROOT})
     set(PHOENIX_XPLANE_SDK_PATH
         "$ENV{XPLANE_SDK_ROOT}"
@@ -329,6 +334,23 @@ if(PHOENIX_BUILD_XPLANE_PLUGIN)
                     "${PHOENIX_XPLANE_PLUGIN_DEPLOY_DIR}/$<TARGET_FILE_NAME:PhoenixXPlanePlugin>"
             COMMENT
                     "Deploying Phoenix.xpl to ${PHOENIX_XPLANE_PLUGIN_DEPLOY_DIR}"
+        )
+    endif()
+
+    if(PHOENIX_DISTRIBUTION_DIR)
+        set(PHOENIX_DISTRIBUTION_PLUGIN_DIR
+            "${PHOENIX_DISTRIBUTION_DIR}/${PHOENIX_XPLANE_PLUGIN_ABI_DIR}")
+
+        add_custom_command(
+            TARGET PhoenixXPlanePlugin
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "${PHOENIX_DISTRIBUTION_PLUGIN_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:PhoenixXPlanePlugin>"
+                    "${PHOENIX_DISTRIBUTION_PLUGIN_DIR}/$<TARGET_FILE_NAME:PhoenixXPlanePlugin>"
+            COMMENT
+                    "Updating distributable Phoenix plugin at ${PHOENIX_DISTRIBUTION_PLUGIN_DIR}"
         )
     endif()
 endif()
