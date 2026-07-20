@@ -1,0 +1,81 @@
+{
+  "catalogVersion": 1,
+  "name": "CockpitLink Base Behaviors",
+  "behaviors": [
+    {
+      "id": "lights.beacon",
+      "label": "Beacon lights",
+      "kind": "toggle",
+      "valueType": "bool",
+      "direction": "readWrite",
+      "defaultUpdate": {
+        "rateMs": 100,
+        "bucket": 1
+      },
+      "bindings": {
+        "xplane": {
+          "default": {
+            "read": {
+              "dataref": "sim/cockpit/electrical/beacon_lights_on",
+              "type": "int"
+            },
+            "write": {
+              "command": "sim/lights/beacon_lights_toggle"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "gear.handle",
+      "label": "Landing gear handle",
+      "kind": "toggle",
+      "valueType": "bool",
+      "direction": "readWrite",
+      "defaultUpdate": {
+        "rateMs": 100,
+        "bucket": 1
+      },
+      "bindings": {
+        "xplane": {
+          "default": {
+            "read": {
+              "dataref": "sim/cockpit/switches/gear_handle_status",
+              "type": "int"
+            },
+            "write": {
+              "dataref": "sim/cockpit/switches/gear_handle_status",
+              "type": "int"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "autopilot.heading_bug",
+      "label": "Autopilot heading bug",
+      "kind": "axis",
+      "valueType": "float",
+      "unit": "degrees",
+      "direction": "readWrite",
+      "defaultUpdate": {
+        "rateMs": 100,
+        "bucket": 1
+      },
+      "bindings": {
+        "xplane": {
+          "default": {
+            "read": {
+              "dataref": "sim/cockpit/autopilot/heading_mag",
+              "type": "float"
+            },
+            "write": {
+              "dataref": "sim/cockpit/autopilot/heading_mag",
+              "type": "float"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

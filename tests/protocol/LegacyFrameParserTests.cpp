@@ -187,6 +187,36 @@ int main()
         passed &= expect(update != nullptr, "string update metadata should decode");
         passed &= expect(update && update->handle == 12, "string update handle failed");
         passed &= expect(update && update->byteCount == 10, "string update byte count failed");
+        passed &= expect(
+            update && update->value == "raw-string",
+            "string update payload failed");
+    }
+
+    {
+        LegacyFrameParser parser;
+
+        auto frames = parser.push(bytes("[9,2,6]ab"));
+        passed &= expect(frames.empty(), "partial binary string should wait");
+        passed &= expect(parser.hasPartialFrame(), "partial binary string should be tracked");
+
+        const std::string tail{
+            {'c', '\0', 'd', 'e'}
+        };
+        frames = parser.push(
+            bytes(std::string_view{ tail.data(), tail.size() }));
+        passed &= expect(frames.size() == 1, "split binary string should parse");
+
+        const auto message = decodeFrame(frames[0]);
+        const auto* update = std::get_if<StringDataRefUpdate>(&message);
+        passed &= expect(update != nullptr, "split binary string should decode");
+        passed &= expect(update && update->handle == 2, "split binary string handle failed");
+        passed &= expect(update && update->byteCount == 6, "split binary string byte count failed");
+        passed &= expect(
+            update && update->value.size() == 6,
+            "split binary string size failed");
+        passed &= expect(
+            update && update->value[3] == '\0',
+            "split binary string should preserve embedded null");
     }
 
     {

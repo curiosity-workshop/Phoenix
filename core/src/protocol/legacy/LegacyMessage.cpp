@@ -169,7 +169,8 @@ namespace phoenix::protocol::legacy
         case dataRefUpdateStringCommand:
             return StringDataRefUpdate{
                 fields.size() > 0 ? toInt(fields[0]) : -1,
-                fields.size() > 1 ? toInt(fields[1]) : 0
+                fields.size() > 1 ? toInt(fields[1]) : 0,
+                frame.binaryPayload
             };
 
         case dataRefTouchRequestCommand:

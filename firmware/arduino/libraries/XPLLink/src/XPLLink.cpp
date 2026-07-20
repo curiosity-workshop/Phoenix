@@ -381,12 +381,32 @@ namespace phoenix
             return 0;
         }
 
-        if (size > XPLMAX_PACKETSIZE_RECEIVE)
+        if (size <= 0)
         {
-            size = XPLMAX_PACKETSIZE_RECEIVE;
+            return 0;
         }
 
-        return stream_->readBytes(receiveBuffer_, size);
+        const int bytesToStore =
+            size > XPLMAX_PACKETSIZE_RECEIVE ?
+                XPLMAX_PACKETSIZE_RECEIVE :
+                size;
+
+        const int bytesRead =
+            stream_->readBytes(receiveBuffer_, bytesToStore);
+
+        for (int index = bytesToStore;
+            index < size;
+            ++index)
+        {
+            stream_->read();
+        }
+
+        if (bytesRead < XPLMAX_PACKETSIZE_RECEIVE)
+        {
+            receiveBuffer_[bytesRead] = 0;
+        }
+
+        return bytesRead;
     }
 
     void XPLLink::processPacket()
@@ -484,7 +504,8 @@ namespace phoenix
         case XPLCMD_DATAREFUPDATESTRING:
             parseInt(&inboundData_.handle, receiveBuffer_, 2);
             parseInt(&inboundData_.strLength, receiveBuffer_, 3);
-            receiveNSerial(inboundData_.strLength);
+            inboundData_.strLength =
+                receiveNSerial(inboundData_.strLength);
             inboundData_.type = xplmType_Data;
             inboundData_.inStr = receiveBuffer_;
             if (inboundHandler_ != nullptr)

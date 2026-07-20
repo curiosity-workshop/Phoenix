@@ -75,6 +75,7 @@ namespace phoenix::protocol::legacy
     {
         int handle = -1;
         int byteCount = 0;
+        std::string value;
     };
 
     struct DataRefTouch

@@ -101,6 +101,11 @@ namespace
             return result;
         }
 
+        const std::vector<std::byte>& writtenBytes() const
+        {
+            return written_;
+        }
+
     private:
         bool open_ = true;
         std::deque<std::vector<std::byte>> incoming_;
@@ -425,6 +430,76 @@ int main()
         passed &= expect(
             bucketTransport.writtenText().ends_with("[2,0,1010]"),
             "bucket scheduler next rounded frame failed");
+    }
+
+    {
+        FakeTransport dataTransport;
+        FakeXPlaneBridge dataXPlane;
+        dataXPlane.dataRefType = phoenix::xplane::DataRefTypeData;
+        dataXPlane.currentValue =
+            std::string{ {'A', '\0', 'B', 'C', '\0', 'D'} };
+
+        LegacyDeviceSession dataSession{
+            dataTransport,
+            LegacyDeviceSessionOptions{
+                .readBufferSize = 128,
+                .maximumReadPasses = 8
+            }
+        };
+
+        LegacyDeviceController dataController{
+            dataSession,
+            dataXPlane
+        };
+
+        LegacyUpdateScheduler dataScheduler{
+            dataSession,
+            dataController,
+            dataXPlane
+        };
+
+        dataTransport.pushIncoming(
+            "[b,\"sim/test/data\"][y,0,32,100,0.0000]");
+
+        controllerTick =
+            dataController.tick();
+
+        passed &= expect(
+            controllerTick.messagesProcessed == 2,
+            "data update setup messages should process");
+
+        const auto dataTick =
+            dataScheduler.tick(start);
+
+        passed &= expect(
+            dataTick.updatesQueued == 1,
+            "data scheduler should send binary value");
+
+        const std::string expected{
+            {'[', 'D', ',', '0', ']', '[', '9', ',', '0', ',', '6', ']',
+             'A', '\0', 'B', 'C', '\0', 'D'}
+        };
+
+        const auto& written =
+            dataTransport.writtenBytes();
+
+        passed &= expect(
+            written.size() == expected.size(),
+            "data scheduler byte count failed");
+
+        if (written.size() == expected.size())
+        {
+            for (std::size_t index = 0;
+                index < written.size();
+                ++index)
+            {
+                passed &= expect(
+                    static_cast<char>(
+                        std::to_integer<unsigned char>(written[index])) ==
+                        expected[index],
+                    "data scheduler binary payload failed");
+            }
+        }
     }
 
     return passed ? 0 : 1;

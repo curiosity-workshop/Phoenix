@@ -20,6 +20,15 @@ namespace phoenix::protocol::legacy
         bool hasPartialFrame() const;
 
     private:
+        void consumeBinaryPayload(
+            char character,
+            std::vector<LegacyFrame>& frames);
+
+        void completeTextFrame(
+            std::vector<LegacyFrame>& frames);
+
         std::string buffer_;
+        LegacyFrame pendingBinaryFrame_;
+        std::size_t pendingBinaryBytes_ = 0;
     };
 }

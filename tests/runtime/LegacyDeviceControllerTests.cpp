@@ -279,6 +279,7 @@ int main()
     using phoenix::runtime::LegacyDeviceController;
     using phoenix::runtime::LegacyDeviceSession;
     using phoenix::runtime::LegacyDeviceSessionOptions;
+    using phoenix::xplane::DataRefTypeData;
     using phoenix::xplane::DataRefTypeFloat;
     using phoenix::xplane::DataRefTypeInt;
 
@@ -289,6 +290,7 @@ int main()
     FakeLegacyDeviceObserver observer;
 
     xplane.dataRefs["sim/test/int"] = DataRefTypeInt;
+    xplane.dataRefs["sim/test/data"] = DataRefTypeData;
     xplane.dataRefs["sim/test/float"] = DataRefTypeFloat;
     xplane.commands.push_back("sim/test/command");
 
@@ -350,6 +352,39 @@ int main()
         "dataref update name failed");
     passed &= expect(xplane.dataRefWrites[0].value == "42", "dataref update value failed");
 
+    transport.pushIncoming("[b,\"sim/test/data\"]");
+    tick = controller.tick();
+
+    passed &= expect(
+        tick.messagesProcessed == 1,
+        "data dataref registration should process");
+
+    const std::string binaryUpdate{
+        {'[', '9', ',', '1', ',', '6', ']', 'A', '\0', 'B', 'C', '\0', 'D'}
+    };
+    transport.pushIncoming(binaryUpdate);
+    tick = controller.tick();
+
+    passed &= expect(
+        tick.messagesProcessed == 1,
+        "binary dataref update should process");
+    passed &= expect(
+        xplane.dataRefWrites.size() == 2,
+        "binary dataref update should reach xplane");
+    passed &= expect(
+        xplane.dataRefWrites[1].name == "sim/test/data",
+        "binary dataref update name failed");
+    passed &= expect(
+        xplane.dataRefWrites[1].valueType == DataRefTypeData,
+        "binary dataref update type failed");
+    passed &= expect(
+        xplane.dataRefWrites[1].value.size() == 6,
+        "binary dataref update size failed");
+    passed &= expect(
+        xplane.dataRefWrites[1].value[1] == '\0' &&
+        xplane.dataRefWrites[1].value[4] == '\0',
+        "binary dataref update should preserve embedded nulls");
+
     transport.pushIncoming("[r,0,100,0.0000]");
     tick = controller.tick();
 
@@ -361,8 +396,8 @@ int main()
         controller.updateSubscriptions()[0].forceUpdate,
         "updates request should force initial update");
     passed &= expect(
-        observer.requests.size() == 3 &&
-        observer.requests[2] == "updates:0:100:0.0000",
+        observer.requests.size() == 4 &&
+        observer.requests[3] == "updates:0:100:0.0000",
         "updates request should be observable");
 
     transport.pushIncoming("[r,0,1000,10.0000]");
@@ -386,8 +421,8 @@ int main()
     passed &= expect(controller.dataRefs()[0].scalingActive, "scaling should be active");
     passed &= expect(controller.dataRefs()[0].scaleFromHigh == 1024, "scaling range failed");
     passed &= expect(
-        observer.requests.size() == 4 &&
-        observer.requests[3] == "scaling:0:0:1024:0:1",
+        observer.requests.size() == 6 &&
+        observer.requests[5] == "scaling:0:0:1024:0:1",
         "scaling request should be observable");
 
     transport.pushIncoming("[k,0,3]");
@@ -485,7 +520,7 @@ int main()
             profileController.updateSubscriptions()[0].rate == 250,
             "profile update subscription rate should be retained");
 
-        profileTransport.pushIncoming("[r,0,100,0.0000]");
+        profileTransport.pushIncoming("[y,0,2,100,0.0000]");
         auto profileTick = profileController.tick();
 
         passed &= expect(

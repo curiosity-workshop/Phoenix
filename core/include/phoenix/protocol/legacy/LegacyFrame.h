@@ -46,6 +46,7 @@ namespace phoenix::protocol::legacy
     {
         char command = '\0';
         std::string payload;
+        std::string binaryPayload;
         std::string raw;
     };
 

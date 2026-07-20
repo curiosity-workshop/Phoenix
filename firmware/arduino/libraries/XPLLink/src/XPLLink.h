@@ -23,7 +23,7 @@
 #endif
 
 #ifndef XPLMAX_PACKETSIZE_RECEIVE
-#define XPLMAX_PACKETSIZE_RECEIVE 200
+#define XPLMAX_PACKETSIZE_RECEIVE 512
 #endif
 
 #if XPL_USE_PROGMEM
@@ -180,7 +180,7 @@ namespace phoenix
         XPLLinkData inboundData_{};
         char sendBuffer_[XPLMAX_PACKETSIZE_TRANSMIT]{};
         char receiveBuffer_[XPLMAX_PACKETSIZE_RECEIVE]{};
-        uint8_t receiveBufferBytesReceived_ = 0;
+        size_t receiveBufferBytesReceived_ = 0;
 
         void (*initFunction_)(void) = nullptr;
         void (*stopFunction_)(void) = nullptr;

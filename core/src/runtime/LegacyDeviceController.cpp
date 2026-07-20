@@ -1,5 +1,6 @@
 #include <phoenix/runtime/LegacyDeviceController.h>
 
+#include <optional>
 #include <sstream>
 #include <variant>
 
@@ -230,6 +231,15 @@ namespace phoenix::runtime
                 else if constexpr (std::is_same_v<Message, protocol::legacy::DataRefUpdate>)
                 {
                     handleDataRefUpdate(value);
+                }
+                else if constexpr (std::is_same_v<Message, protocol::legacy::StringDataRefUpdate>)
+                {
+                    handleDataRefUpdate({
+                        protocol::legacy::DataRefValueType::String,
+                        value.handle,
+                        value.value,
+                        std::nullopt
+                    });
                 }
                 else if constexpr (std::is_same_v<Message, protocol::legacy::UpdatesRequest>)
                 {
