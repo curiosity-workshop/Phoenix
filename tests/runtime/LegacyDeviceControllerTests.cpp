@@ -425,6 +425,15 @@ int main()
         observer.requests[5] == "scaling:0:0:1024:0:1",
         "scaling request should be observable");
 
+    transport.pushIncoming("[1,0,512]");
+    tick = controller.tick();
+
+    passed &= expect(tick.messagesProcessed == 1, "scaled dataref write should process");
+    passed &= expect(
+        xplane.dataRefWrites.size() >= 3 &&
+        xplane.dataRefWrites.back().value == "0.5",
+        "scaled dataref write should map raw values before X-Plane write");
+
     transport.pushIncoming("[k,0,3]");
     tick = controller.tick();
 

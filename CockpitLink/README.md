@@ -46,6 +46,21 @@ The current host probe app lists candidate serial ports:
 out/build/cockpitlink-Debug/CockpitLinkProbe.exe
 ```
 
+If a board is flashed with the CockpitLink `ButtonBox` example, the probe will
+send a binary `Hello` frame and should receive a `HelloAck` containing the
+device name and firmware version.
+
+The current `ButtonBox` example also requests `lights.beacon` for
+`LED_BUILTIN`. The probe assigns handle `0`, accepts the subscription, and sends
+four fake boolean updates two seconds apart so the LED can prove the behavior
+path.
+
+The probe writes raw and decoded serial trace output to:
+
+```text
+CockpitLink/logs/CockpitLinkSerial.log
+```
+
 ## Non-Goals For The First Pass
 
 - Replacing Phoenix.

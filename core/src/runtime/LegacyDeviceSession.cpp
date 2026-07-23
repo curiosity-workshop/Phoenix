@@ -20,7 +20,8 @@ namespace phoenix::runtime
 
         if (options_.maximumReadPasses == 0)
         {
-            options_.maximumReadPasses = 1;
+            options_.maximumReadPasses =
+                LegacyDeviceSessionOptions{}.maximumReadPasses;
         }
     }
 

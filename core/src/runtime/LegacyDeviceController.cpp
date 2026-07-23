@@ -1,7 +1,9 @@
 #include <phoenix/runtime/LegacyDeviceController.h>
 
+#include <iomanip>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <variant>
 
 namespace phoenix::runtime
@@ -47,6 +49,65 @@ namespace phoenix::runtime
             std::ostringstream payload;
             payload << ",-02,\"" << name << '"';
             return payload.str();
+        }
+
+        std::string formatScaledValue(double value)
+        {
+            std::ostringstream output;
+            output
+                << std::fixed
+                << std::setprecision(6)
+                << value;
+
+            auto result =
+                output.str();
+
+            while (result.size() > 1 &&
+                result.back() == '0')
+            {
+                result.pop_back();
+            }
+
+            if (!result.empty() &&
+                result.back() == '.')
+            {
+                result.pop_back();
+            }
+
+            return result;
+        }
+
+        std::string applyScaling(
+            const LegacyDataRefBinding& binding,
+            std::string_view value)
+        {
+            if (!binding.scalingActive ||
+                binding.scaleFromHigh == binding.scaleFromLow)
+            {
+                return std::string{ value };
+            }
+
+            try
+            {
+                const double input =
+                    std::stod(std::string{ value });
+                const double normalized =
+                    (input -
+                        static_cast<double>(binding.scaleFromLow)) /
+                    (static_cast<double>(binding.scaleFromHigh) -
+                        static_cast<double>(binding.scaleFromLow));
+                const double scaled =
+                    static_cast<double>(binding.scaleToLow) +
+                    normalized *
+                    (static_cast<double>(binding.scaleToHigh) -
+                        static_cast<double>(binding.scaleToLow));
+
+                return formatScaledValue(scaled);
+            }
+            catch (const std::exception&)
+            {
+                return std::string{ value };
+            }
         }
     }
 
@@ -373,7 +434,9 @@ namespace phoenix::runtime
             binding->name,
             binding->handle,
             toXPlaneType(message.type),
-            message.value,
+            message.type == protocol::legacy::DataRefValueType::String ?
+                message.value :
+                applyScaling(*binding, message.value),
             message.element
         });
     }

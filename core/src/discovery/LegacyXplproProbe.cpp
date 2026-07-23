@@ -12,6 +12,8 @@ namespace phoenix::discovery
 {
     namespace
     {
+        constexpr int maximumProbeReadPasses = 16;
+
         std::string extractQuotedString(std::string_view payload)
         {
             const std::size_t firstQuote = payload.find('"');
@@ -100,50 +102,59 @@ namespace phoenix::discovery
                     currentTime + retryInterval_;
             }
 
-            const std::size_t bytesRead =
-                transport.read(readBuffer);
-
-            if (trace.serialTrace != nullptr &&
-                bytesRead > 0)
+            for (int pass = 0;
+                pass < maximumProbeReadPasses;
+                ++pass)
             {
-                trace.serialTrace->bytes(
-                    logging::ByteDumpDirection::Receive,
-                    trace.portName,
-                    std::span<const std::byte>{
-                        readBuffer.data(),
-                        bytesRead
-                    });
-            }
+                const std::size_t bytesRead =
+                    transport.read(readBuffer);
 
-            const auto frames =
-                parser.push(
-                    std::span<const std::byte>{
-                        readBuffer.data(),
-                        bytesRead
-                    });
-
-            for (const auto& frame : frames)
-            {
-                if (frame.command ==
-                    protocol::legacy::nameResponseCommand)
+                if (bytesRead == 0)
                 {
-                    discoveredDevice.name =
-                        extractQuotedString(frame.payload);
-                }
-                else if (frame.command ==
-                    protocol::legacy::versionResponseCommand)
-                {
-                    discoveredDevice.version =
-                        extractQuotedString(frame.payload);
+                    break;
                 }
 
-                /*
-                 * The name response is enough to prove that this is
-                 * an XPLPro device. Version is useful but optional.
-                 */
-                if (!discoveredDevice.name.empty())
+                if (trace.serialTrace != nullptr)
                 {
-                    return discoveredDevice;
+                    trace.serialTrace->bytes(
+                        logging::ByteDumpDirection::Receive,
+                        trace.portName,
+                        std::span<const std::byte>{
+                            readBuffer.data(),
+                            bytesRead
+                        });
+                }
+
+                const auto frames =
+                    parser.push(
+                        std::span<const std::byte>{
+                            readBuffer.data(),
+                            bytesRead
+                        });
+
+                for (const auto& frame : frames)
+                {
+                    if (frame.command ==
+                        protocol::legacy::nameResponseCommand)
+                    {
+                        discoveredDevice.name =
+                            extractQuotedString(frame.payload);
+                    }
+                    else if (frame.command ==
+                        protocol::legacy::versionResponseCommand)
+                    {
+                        discoveredDevice.version =
+                            extractQuotedString(frame.payload);
+                    }
+
+                    /*
+                     * The name response is enough to prove that this is
+                     * an XPLPro device. Version is useful but optional.
+                     */
+                    if (!discoveredDevice.name.empty())
+                    {
+                        return discoveredDevice;
+                    }
                 }
             }
 

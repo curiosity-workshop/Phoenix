@@ -30,6 +30,7 @@ x86/
 # Runtime logs
 PhoenixSerial.log
 profiles/*.json
+CockpitLink/logs/
 
 # OS
 Thumbs.db

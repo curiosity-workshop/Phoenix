@@ -43,7 +43,7 @@ namespace phoenix::runtime
         std::filesystem::path profileDirectory;
         LegacyUpdateSchedulerOptions updateScheduler;
         std::size_t readBufferSize = 256;
-        std::size_t maximumReadPasses = 8;
+        std::size_t maximumReadPasses = 16;
     };
 
     class DeviceRuntimeManager

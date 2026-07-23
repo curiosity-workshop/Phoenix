@@ -65,6 +65,12 @@ CockpitLink.behavior("aircraft.custom.payload")
 - `switchInput(pin).controls(behaviorId)`
 - `button(pin).triggers(behaviorId)`
 - `button(pin).startsEnds(behaviorId)`
+- `potentiometer(pin).controls(behaviorId)`
+- `potentiometer(pin).calibrated(rawMin, rawMax)`
+- `potentiometer(pin).deadband(percent)`
+- `potentiometer(pin).bucket(percent)`
+- `potentiometer(pin).sampleEvery(milliseconds)`
+- `potentiometer(pin).readPercent()`
 - `digitalOutput(pin).follows(behaviorId)`
 - `encoder(pinA, pinB).changes(behaviorId, step)`
 - `display(lcd).line(index).shows(behaviorId)`
@@ -72,3 +78,23 @@ CockpitLink.behavior("aircraft.custom.payload")
 - `onDisconnected(callback)`
 - `debug(message)`
 - `debugValue(label, value)`
+
+## Capability-Aware Behavior
+
+The user-facing API should make unavailable simulator abilities visible without
+making sketches fragile.
+
+Examples:
+
+```cpp
+auto beacon = CockpitLink.behavior("lights.beacon");
+
+if (beacon.canWrite()) {
+    CockpitLink.switchInput(7).controls(beacon);
+}
+
+CockpitLink.digitalOutput(LED_BUILTIN).follows(beacon);
+```
+
+For common sketches, helpers can report errors through diagnostics and keep the
+rest of the device running.

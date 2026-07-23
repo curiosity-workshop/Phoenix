@@ -24,10 +24,15 @@ The behavior model defines simulator-neutral concepts:
 - Value type: `bool`
 - Units: optional
 - Direction: readable, writable, or both
+- Desired capability versus actual simulator capability
 - Recommended update policy
 
 Behavior IDs should be stable. Bindings may change by simulator, aircraft, or
 profile.
+
+The behavior model must account for simulators having different abilities. A
+behavior can be conceptually read/write while a specific simulator binding is
+read-only, command-only, unsupported, or emulated through another operation.
 
 ## Simulator Adapters
 
@@ -49,6 +54,16 @@ read behavior value
 write behavior value
 trigger behavior action
 ```
+
+The binding plan includes capability status. For example, an X-Plane adapter
+may support beacon lights as `read=native` and `write=emulatedByCommand`, while
+another simulator may expose the same behavior as `read=native` and
+`write=unsupported`.
+
+Adapters must also expose write strategy. A toggle command is not the same as a
+direct state write. For switch-style hardware, the host should only use a toggle
+command to set state when it can first read the current simulator value and
+determine that a toggle is actually needed.
 
 ## Transport Layer
 
@@ -83,3 +98,7 @@ RX subscribe behavior=lights.beacon rate=100 bucket=1
 TX update behavior=lights.beacon type=bool value=true
 RX command behavior=autopilot.ap_disconnect action=trigger count=1
 ```
+
+Diagnostics are part of the design, not an afterthought. The host should decode
+binary frames into readable trace lines and include capability failures in the
+same log stream.

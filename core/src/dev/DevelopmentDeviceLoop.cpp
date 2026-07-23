@@ -378,7 +378,7 @@ namespace phoenix::dev
                         .maxBytesPerTick = 64
                     },
                     .readBufferSize = 256,
-                    .maximumReadPasses = 8
+                    .maximumReadPasses = 16
                 },
                 &observerFactory)
         {
