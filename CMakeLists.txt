@@ -47,6 +47,30 @@ if(NOT PHOENIX_XPLANE_SDK_PATH AND EXISTS "${CMAKE_SOURCE_DIR}/third_party/xplan
         FORCE)
 endif()
 
+set(PHOENIX_SERIAL_SOURCES
+    core/src/serial/SerialDeviceClassifier.cpp
+)
+
+if(WIN32)
+    list(APPEND PHOENIX_SERIAL_SOURCES
+        core/src/serial/WindowsSerialEnumerator.cpp
+        core/src/serial/WindowsSerialTransport.cpp
+        core/src/serial/WindowsSerialTransportFactory.cpp
+    )
+elseif(APPLE)
+    list(APPEND PHOENIX_SERIAL_SOURCES
+        core/src/serial/MacSerialEnumerator.cpp
+        core/src/serial/MacSerialTransport.cpp
+        core/src/serial/MacSerialTransportFactory.cpp
+    )
+else()
+    list(APPEND PHOENIX_SERIAL_SOURCES
+        core/src/serial/LinuxSerialEnumerator.cpp
+        core/src/serial/LinuxSerialTransport.cpp
+        core/src/serial/LinuxSerialTransportFactory.cpp
+    )
+endif()
+
 add_executable(Phoenix
     # Application
     core/src/main.cpp
@@ -71,10 +95,7 @@ add_executable(Phoenix
     core/src/runtime/LegacyUpdateScheduler.cpp
 
     # Serial
-    core/src/serial/WindowsSerialEnumerator.cpp
-    core/src/serial/WindowsSerialTransport.cpp
-    core/src/serial/WindowsSerialTransportFactory.cpp
-    core/src/serial/SerialDeviceClassifier.cpp
+    ${PHOENIX_SERIAL_SOURCES}
 
     # Discovery
     core/src/discovery/LegacyXplproProbe.cpp
@@ -247,10 +268,7 @@ if(PHOENIX_BUILD_XPLANE_PLUGIN)
         core/src/runtime/LegacyUpdateScheduler.cpp
 
         # Serial
-        core/src/serial/WindowsSerialEnumerator.cpp
-        core/src/serial/WindowsSerialTransport.cpp
-        core/src/serial/WindowsSerialTransportFactory.cpp
-        core/src/serial/SerialDeviceClassifier.cpp
+        ${PHOENIX_SERIAL_SOURCES}
 
         # X-Plane SDK adapter
         core/src/xplane/sdk/XPlaneSdkApi.cpp
@@ -303,6 +321,12 @@ if(PHOENIX_BUILD_XPLANE_PLUGIN)
                 LIN=0
         )
 
+        target_link_libraries(PhoenixXPlanePlugin
+            PRIVATE
+                "${PHOENIX_XPLANE_SDK_PATH}/Libraries/Mac/XPLM.framework"
+                "${PHOENIX_XPLANE_SDK_PATH}/Libraries/Mac/XPWidgets.framework"
+        )
+
         set(PHOENIX_XPLANE_PLUGIN_ABI_DIR "mac_x64")
     else()
         target_compile_definitions(PhoenixXPlanePlugin
@@ -310,6 +334,12 @@ if(PHOENIX_BUILD_XPLANE_PLUGIN)
                 IBM=0
                 APL=0
                 LIN=1
+        )
+
+        target_link_libraries(PhoenixXPlanePlugin
+            PRIVATE
+                "${PHOENIX_XPLANE_SDK_PATH}/Libraries/Lin/XPLM_64.so"
+                "${PHOENIX_XPLANE_SDK_PATH}/Libraries/Lin/XPWidgets_64.so"
         )
 
         set(PHOENIX_XPLANE_PLUGIN_ABI_DIR "lin_x64")

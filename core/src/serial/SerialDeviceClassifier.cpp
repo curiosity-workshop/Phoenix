@@ -73,13 +73,18 @@ namespace phoenix::serial
         if (contains(hardwareId, "VID_2A03") || // Arduino.org
             contains(hardwareId, "VID_1A86") || // CH340
             contains(hardwareId, "VID_10C4") || // CP210x
-            contains(hardwareId, "VID_0403"))   // FTDI
+            contains(hardwareId, "VID_0403") || // FTDI
+            contains(hardwareId, "USBMODEM") ||
+            contains(hardwareId, "USBSERIAL") ||
+            contains(hardwareId, "WCHUSB") ||
+            contains(hardwareId, "SLAB_USBTOUART"))
         {
             return SerialDeviceKind::ArduinoCompatible;
         }
 
         if (contains(hardwareId, "USB\\") ||
             contains(displayName, "USB SERIAL") ||
+            contains(displayName, "USBSERIAL") ||
             contains(manufacturer, "FTDI") ||
             contains(manufacturer, "SILICON LABS"))
         {

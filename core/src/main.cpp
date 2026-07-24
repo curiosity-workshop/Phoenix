@@ -2,10 +2,9 @@
 #include <phoenix/dev/DevelopmentDeviceLoop.h>
 #include <phoenix/logging/Log.h>
 #include <phoenix/logging/SerialTraceLogger.h>
+#include <phoenix/serial/NativeSerial.h>
 #include <phoenix/serial/SerialDeviceClassifier.h>
 #include <phoenix/serial/SerialDeviceKind.h>
-#include <phoenix/serial/WindowsSerialEnumerator.h>
-#include <phoenix/serial/WindowsSerialTransportFactory.h>
 #include <phoenix/transport/IByteTransport.h>
 
 #include <chrono>
@@ -43,16 +42,16 @@ namespace
     }
 
     std::string_view controlModeName(
-        phoenix::serial::WindowsSerialControlMode mode)
+        phoenix::serial::NativeSerialControlMode mode)
     {
-        using phoenix::serial::WindowsSerialControlMode;
+        using phoenix::serial::NativeSerialControlMode;
 
         switch (mode)
         {
-        case WindowsSerialControlMode::DtrRtsDisabled:
+        case NativeSerialControlMode::DtrRtsDisabled:
             return "DTR/RTS disabled";
 
-        case WindowsSerialControlMode::DtrRtsEnabled:
+        case NativeSerialControlMode::DtrRtsEnabled:
             return "DTR/RTS enabled";
         }
 
@@ -95,8 +94,8 @@ int main()
         "Phoenix starting\n"
         "Enumerating serial ports...\n\n");
 
-    phoenix::serial::WindowsSerialEnumerator enumerator;
-    phoenix::serial::WindowsSerialTransportFactory transportFactory;
+    phoenix::serial::NativeSerialEnumerator enumerator;
+    phoenix::serial::NativeSerialTransportFactory transportFactory;
 
     const auto ports = enumerator.enumerate();
 
@@ -213,9 +212,9 @@ int main()
         std::unique_ptr<phoenix::transport::IByteTransport> transport;
         std::optional<phoenix::discovery::DiscoveredDevice> device;
 
-        const phoenix::serial::WindowsSerialControlMode controlModes[] = {
-            phoenix::serial::WindowsSerialControlMode::DtrRtsDisabled,
-            phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled
+        const phoenix::serial::NativeSerialControlMode controlModes[] = {
+            phoenix::serial::NativeSerialControlMode::DtrRtsDisabled,
+            phoenix::serial::NativeSerialControlMode::DtrRtsEnabled
         };
 
         for (const auto controlMode : controlModes)

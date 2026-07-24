@@ -5,11 +5,10 @@
 #include <phoenix/protocol/legacy/LegacyFrame.h>
 #include <phoenix/protocol/legacy/LegacyFrameParser.h>
 #include <phoenix/runtime/DeviceRuntimeManager.h>
+#include <phoenix/serial/NativeSerial.h>
 #include <phoenix/serial/SerialDeviceClassifier.h>
 #include <phoenix/serial/SerialDeviceKind.h>
 #include <phoenix/serial/SerialPortInfo.h>
-#include <phoenix/serial/WindowsSerialEnumerator.h>
-#include <phoenix/serial/WindowsSerialTransportFactory.h>
 #include <phoenix/transport/IByteTransport.h>
 #include <phoenix/xplane/sdk/XPlaneSdkApi.h>
 #include <phoenix/xplane/sdk/XPlaneSdkBridge.h>
@@ -108,16 +107,16 @@ namespace
     }
 
     std::string controlModeName(
-        phoenix::serial::WindowsSerialControlMode mode)
+        phoenix::serial::NativeSerialControlMode mode)
     {
-        using phoenix::serial::WindowsSerialControlMode;
+        using phoenix::serial::NativeSerialControlMode;
 
         switch (mode)
         {
-        case WindowsSerialControlMode::DtrRtsDisabled:
+        case NativeSerialControlMode::DtrRtsDisabled:
             return "DTR/RTS disabled";
 
-        case WindowsSerialControlMode::DtrRtsEnabled:
+        case NativeSerialControlMode::DtrRtsEnabled:
             return "DTR/RTS enabled";
         }
 
@@ -424,8 +423,8 @@ namespace
         std::unique_ptr<phoenix::transport::IByteTransport> transport;
         phoenix::protocol::legacy::LegacyFrameParser parser;
         phoenix::discovery::DiscoveredDevice device;
-        phoenix::serial::WindowsSerialControlMode controlMode =
-            phoenix::serial::WindowsSerialControlMode::DtrRtsDisabled;
+        phoenix::serial::NativeSerialControlMode controlMode =
+            phoenix::serial::NativeSerialControlMode::DtrRtsDisabled;
         std::chrono::steady_clock::time_point deadline{};
         std::chrono::steady_clock::time_point nextRequestAt{};
         bool requestsStarted = false;
@@ -1093,7 +1092,7 @@ namespace
             }
 
             if (activeProbe_->controlMode ==
-                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled)
+                phoenix::serial::NativeSerialControlMode::DtrRtsEnabled)
             {
                 return false;
             }
@@ -1114,7 +1113,7 @@ namespace
             std::string_view reason)
         {
             if (probe.controlMode ==
-                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled)
+                phoenix::serial::NativeSerialControlMode::DtrRtsEnabled)
             {
                 return false;
             }
@@ -1126,7 +1125,7 @@ namespace
             }
 
             probe.controlMode =
-                phoenix::serial::WindowsSerialControlMode::DtrRtsEnabled;
+                phoenix::serial::NativeSerialControlMode::DtrRtsEnabled;
             probe.transport =
                 transportFactory_.create(
                     probe.port.portName,
@@ -1491,8 +1490,8 @@ namespace
         std::filesystem::path settingsPath_;
         ToggleableSerialTraceSink serialTrace_;
         phoenix::runtime::DeviceRuntimeManager deviceRuntime_;
-        phoenix::serial::WindowsSerialEnumerator serialEnumerator_;
-        phoenix::serial::WindowsSerialTransportFactory transportFactory_;
+        phoenix::serial::NativeSerialEnumerator serialEnumerator_;
+        phoenix::serial::NativeSerialTransportFactory transportFactory_;
         phoenix::plugin::PhoenixStatusWindow statusWindow_;
         std::vector<phoenix::serial::SerialPortInfo> portsToProbe_;
         std::optional<IncrementalProbe> activeProbe_;
