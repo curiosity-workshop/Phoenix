@@ -24,6 +24,8 @@ x86/
 *.exe
 *.dll
 *.lib
+!third_party/xplane_sdk/Libraries/Win/
+!third_party/xplane_sdk/Libraries/Win/*.lib
 *.pdb
 *.ilk
 
